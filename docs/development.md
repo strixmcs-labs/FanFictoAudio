@@ -13,9 +13,9 @@ python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements-build.txt
 ```
 
-Use Swift 6 or later and Python 3.12. The package targets macOS 14 or later. The build wrapper supports Command Line Tools and full Xcode installations and keeps compiler caches in `.build`. Homebrew users can install the build/runtime prerequisites with `brew install python@3.12 ffmpeg`.
+Use Swift 6 or later and Python 3.12. The package targets macOS 14 or later. The build wrapper supports Command Line Tools and full Xcode installations and keeps compiler caches in `.build`. Homebrew users can install build/test tools with `brew install python@3.12 ffmpeg`. Release users do not need Homebrew: the app bundles a standalone encoder. Building that encoder from pinned FFmpeg/LAME sources requires Apple development tools and network access on the first build.
 
-`requirements-build.txt` pins the direct dependencies used for version 1.3.0 and constrains transitive versions with `requirements-build.lock`: [FanFicFare](https://github.com/JimmXinu/FanFicFare) 4.62.0, PyInstaller 6.22.3, and pytest 9.1.1. FanFicFare is the upstream download engine by Jim Miller (JimmXinu) and its contributors; preserve its [license and attribution](https://github.com/JimmXinu/FanFicFare/blob/main/LICENSE) when packaging. The transitive constraints pin the tested dependency closure by version; they do not pin package hashes or the complete toolchain. No remote Swift packages are required. Build architecture follows the Swift toolchain and Python interpreter; the release asset is arm64, not universal.
+`requirements-build.txt` pins the direct dependencies used for version 1.4.0 and constrains transitive versions with `requirements-build.lock`: [FanFicFare](https://github.com/JimmXinu/FanFicFare) 4.62.0, PyInstaller 6.22.3, and pytest 9.1.1. FanFicFare is the upstream download engine by Jim Miller (JimmXinu) and its contributors; preserve its [license and attribution](https://github.com/JimmXinu/FanFicFare/blob/main/LICENSE) when packaging. The transitive constraints pin the tested dependency closure by version; they do not pin package hashes or the complete toolchain. No remote Swift packages are required. Build architecture follows the Swift toolchain and Python interpreter; the release asset is arm64, not universal.
 
 ## Run tests
 
@@ -24,7 +24,7 @@ Use Swift 6 or later and Python 3.12. The package targets macOS 14 or later. The
 PYTHONPATH="$PWD/Vendor" .venv/bin/python -m pytest -q Tests/DownloadEngineTests
 ```
 
-Swift Testing covers the EPUB reader, audiobook queue, merger, narration requests, audio export, and native downloader bridge. Python checks use the vendored downloader modules. FanFicFare's `test1.com` adapter creates synthetic stories offline; that fixture URL does not visit a real story site. One connection-reuse test binds only `127.0.0.1`, so restrictive command sandboxes must permit loopback sockets.
+Swift Testing covers the EPUB reader, audiobook queue, merger, narration requests, audio export, and native downloader bridge. Python checks use the vendored downloader modules. FanFicFare's `test1.com` adapter creates synthetic stories offline; that fixture URL does not visit a real story site. Direct-download and connection-reuse tests bind only `127.0.0.1`, so restrictive command sandboxes must permit loopback sockets.
 
 Install FFmpeg before testing: synthetic API audio export checks need a compatible encoder. Provider responses are mocked; no API key or paid speech request is needed. The GitHub Actions workflow runs the native and Python suites and verifies app packaging on an Apple silicon macOS runner. Headless checks do not prove UI behavior or audible voice quality.
 
@@ -35,7 +35,7 @@ Install FFmpeg before testing: synthetic API audio export checks need a compatib
 open 'dist/FanFic to Audio.app'
 ```
 
-The script freezes the downloader with PyInstaller, compiles the release Swift executable, copies resources and license notices, and signs the bundle ad hoc. Existing builds move into `dist/Previous Builds` before replacement. It does not install into Applications or provide notarization.
+The script freezes the downloader with PyInstaller, compiles the release Swift executable, builds or reuses the standalone encoder, copies resources, matching encoder sources and license notices, and signs the bundle ad hoc. Existing builds move into `dist/Previous Builds` before replacement. It does not install into Applications or provide notarization.
 
 To use another Python 3.12 build environment:
 
@@ -84,7 +84,7 @@ The CLI export uses macOS voices. AI key management and provider selection are i
    ./Scripts/package-release.sh
    ```
 
-4. Publish the tested source commit, tag that commit, and upload the ZIP and checksum to the corresponding GitHub release. Record architecture, minimum OS, FFmpeg requirement, and signing status in the notes. Do not silently replace an existing release asset.
+4. Publish the tested source commit, tag that commit, and upload the ZIP and checksum to the corresponding GitHub release. Record architecture, minimum OS, bundled encoder, and signing status in the notes. Do not silently replace an existing release asset.
 5. Compare the remote commit/tag and uploaded asset checksum with the validated local values. Test installation on another Mac when available.
 
 ## Developer ID signing and notarization
@@ -103,7 +103,13 @@ Create a notarization Keychain profile interactively; keep passwords out of shel
 xcrun notarytool store-credentials FanFictoAudio-Notary --team-id YOUR_TEAM_ID
 ```
 
-Notarization authentication uses an Apple ID app-specific password or an App Store Connect API key; the hardware signing key alone is insufficient. Then package the verified app:
+Notarization authentication uses an Apple ID app-specific password or an App Store Connect API key; the hardware signing key alone is insufficient. To submit the app, preserve the Apple receipt, and staple/validate its ticket:
+
+```sh
+./Scripts/notarize-app.sh "dist/FanFic to Audio.app" YOUR_KEYCHAIN_PROFILE
+```
+
+This retains the submission and result under `dist/.notarization.*`. The configured local profile can be reused across releases. Notarization supports direct GitHub distribution; it does not submit the app to the App Store. For ZIP and DMG packaging in one command:
 
 ```sh
 NOTARY_PROFILE=FanFictoAudio-Notary \

@@ -30,7 +30,7 @@ struct APIUsageView: View {
             Text("Enter the rate for your provider, model, and plan; it is saved per model. Include input and audio charges in your all-in estimate. Token and listening-time estimates are approximate. Limits count previews, retries, and failed attempts since Reset Usage; they stop before sending the next passage. Provider invoices may differ, and resumed passages are included in the full-book estimate.")
                 .font(.caption2).foregroundStyle(.secondary)
           }.padding(.top, 10)
-        }.padding(20).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
             .task {
                 while !Task.isCancelled {
                     model.refreshUsage()

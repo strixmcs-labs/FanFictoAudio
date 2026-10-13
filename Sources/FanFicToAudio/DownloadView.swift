@@ -4,31 +4,38 @@ import DownloadCore
 struct DownloadView: View {
     @ObservedObject var model: DownloadModel
     let openBook: (URL) -> Void
-    private let accent = Color(red: 0.24, green: 0.43, blue: 0.48)
+    private let accent = AppTheme.oxblood
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("FROM STORY LINK TO SPOKEN WORD").font(.system(size: 10, weight: .bold, design: .rounded)).tracking(2).foregroundStyle(accent)
-                    Text("Start with a story").font(.system(size: 32, weight: .semibold, design: .serif))
-                    Text("Download a fanfic as an EPUB, then choose its voice and create your audiobook.").foregroundStyle(.secondary)
+                    Text("Download by link").font(.system(size: 32, weight: .semibold, design: .serif))
+                    Text("Paste a story page or an EPUB download link, then choose its voice and create your audiobook.").foregroundStyle(.secondary)
                 }
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Story links").font(.headline)
-                        Text("Paste one story URL per line. Chapter ranges such as [1-5] are supported.").font(.caption).foregroundStyle(.secondary)
+                        Text("Story or EPUB links").font(.headline)
+                        Text("Paste one URL per line. Story chapter ranges such as [1-5] are supported.").font(.caption).foregroundStyle(.secondary)
                         TextEditor(text: $model.links)
                             .font(.system(.body, design: .monospaced)).scrollContentBackground(.hidden)
                             .padding(8).frame(minHeight: 125, maxHeight: 160)
                             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-                            .accessibilityLabel("Story URLs, one per line")
+                            .accessibilityLabel("Story or EPUB URLs, one per line")
                         HStack {
                             Picker("Action", selection: $model.selectedOperation) {
-                                Text("Download EPUB").tag("download")
+                                Text("Download by Link").tag("download")
                                 Text("Preview story").tag("preview")
                                 Text("Find links on a page").tag("extract")
                             }.frame(maxWidth: 290)
+                            if model.selectedOperation == "download" {
+                                Picker("Link type", selection: $model.sourceKind) {
+                                    Text("Detect automatically").tag("auto")
+                                    Text("Story page").tag("story")
+                                    Text("Direct EPUB").tag("epub")
+                                }
+                            }
                             Spacer()
                         }
                         HStack {
@@ -39,7 +46,7 @@ struct DownloadView: View {
                                 .disabled(model.isRunning || model.links.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                     }.padding(20).frame(maxWidth: .infinity)
-                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Download preferences").font(.headline)
                         Text("Save EPUBs to").font(.caption).foregroundStyle(.secondary)
@@ -57,7 +64,7 @@ struct DownloadView: View {
                         Text("Login details come from your selected INI. This choice applies to new and retried jobs.")
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(20).frame(width: 270, alignment: .leading)
-                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
                 }
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
@@ -120,8 +127,8 @@ struct DownloadView: View {
                             }
                         }
                     }
-                }.padding(20).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-                Text("FanFicFare handles supported sites and their access requirements. EPUBs stay in your chosen folder. Choose macOS voices or an AI speech provider in the audiobook section.")
+                }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                Text("FanFicFare handles supported story sites and their access requirements. Direct EPUB links are downloaded and validated before saving. EPUBs stay in your chosen folder. Choose macOS voices or an AI speech provider in the audiobook section.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(32).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
         }

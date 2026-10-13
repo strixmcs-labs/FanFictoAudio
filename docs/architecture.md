@@ -22,6 +22,8 @@ The native queue starts one helper job at a time. The Python helper writes a com
 
 The upstream [FanFicFare](https://github.com/JimmXinu/FanFicFare) engine, by Jim Miller (JimmXinu) and its contributors, implements story downloads, site adapters, metadata extraction, EPUB writing and updates, link extraction, and authentication. The native interface and helper coordinate that engine. Only packaged defaults and an explicitly selected INI are loaded. Session reuse is scoped by site, format, INI fingerprint, adult confirmation, and applicable story-specific settings; bounded caches and connections close with the worker. Site request pacing remains in effect. Downloading and audiobook conversion are separate queue operations.
 
+Direct EPUB links use a separate bounded streaming transfer with verified TLS, limited redirects, no ambient credentials, and ZIP/package/spine validation. Automatic detection falls back to this transfer only when FanFicFare cannot identify a story adapter; recognized site failures remain site failures. Every successful book in a download batch is handed to the saved audiobook queue in order.
+
 ## EPUBs and series
 
 The ZIP reader enforces archive/resource limits, validates paths and entries, and the XML reader does not resolve external entities. The native EPUB reader follows the package spine and EPUB navigation, extracts text, and distinguishes optional/nonlinear sections. Narration does not render the book in a browser.
@@ -34,7 +36,9 @@ The reader's actor cache holds up to three books / 64 MB of extracted text and i
 
 A batch takes a shared settings snapshot and processes books sequentially. A failed book records its error and allows the next one to run. Cancelling pauses the queue and leaves later jobs waiting; retry is explicit and begins a new export.
 
-Local narration invokes `/usr/bin/say`. OpenAI and ElevenLabs use separate request formats through the same speech-service interface. API passages are bounded and sequential; OpenAI also has a conservative UTF-8 byte limit. Provider errors are mapped to messages without displaying raw response bodies. Paid speech requests have no automatic retry or persisted resume cache.
+Local narration invokes `/usr/bin/say`. OpenAI and ElevenLabs use separate request formats through the same speech-service interface. API passages are bounded and sequential; OpenAI also has a conservative UTF-8 byte limit. Provider errors are mapped to messages without displaying raw response bodies. Paid speech requests have no automatic retry. Compatible completed passages can be reused from local checkpoints on explicit retry.
+
+The packaged encoder is built from pinned FFmpeg and LAME sources, statically links its codec libraries, and depends only on macOS system libraries. Sources and license notices accompany the binary. Network and GPL components are disabled.
 
 Each passage becomes decoded PCM audio, which is checked for usable speech data before FFmpeg encoding. A single MP3 joins all passages once; chapter mode writes numbered outputs. Files are staged and then published without overwriting existing destinations. Temporary work is cleaned after success, cancellation, or failure. Audiobook jobs and completed passages are saved for recovery; book previews and download jobs remain in memory for the current session.
 

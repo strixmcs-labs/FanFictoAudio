@@ -33,8 +33,10 @@ final class DownloadModel: ObservableObject {
     @Published var isRunning = false
     @Published var isFinalizing = false
     @Published var readyURL: URL?
+    @Published var readyURLs: [URL] = []
     @Published var errorMessage: String?
     @Published var selectedOperation = "download"
+    @Published var sourceKind = "auto"
     private var runner: DownloadRunner?
     private var task: Task<Void, Never>?
     private var pauseRequested = false
@@ -68,7 +70,8 @@ final class DownloadModel: ObservableObject {
         do {
             let sources = try StoryLinks.parse(links)
             for source in sources {
-                let request = DownloadRequest(operation: selectedOperation, source: source, output: output.path, ini: ini, adult: adult)
+                var request = DownloadRequest(operation: selectedOperation, source: source, output: output.path, ini: ini, adult: adult)
+                request.source_kind = selectedOperation == "download" ? sourceKind : "story"
                 let job = StoryJob(request: request, title: source)
                 jobs.append(job); selected = job.id
             }
@@ -93,9 +96,9 @@ final class DownloadModel: ObservableObject {
     func start() {
         guard !isRunning, hasQueued else { return }
         guard let helper else { errorMessage = "The FanFicFare download helper is missing. Build the complete app with Scripts/build-app.sh."; return }
-        isRunning = true; pauseRequested = false; readyURL = nil
+        isRunning = true; pauseRequested = false; readyURL = nil; readyURLs = []
         task = Task { [self] in
-            var lastBook: URL?
+            var completedBooks: [URL] = []
             while !pauseRequested, let index = jobs.firstIndex(where: { $0.state == "Queued" }) {
                 let id = jobs[index].id
                 jobs[index].state = "Running"
@@ -113,7 +116,7 @@ final class DownloadModel: ObservableObject {
                         jobs[current].progress = 100
                         if let path = result.path {
                             let url = URL(fileURLWithPath: path)
-                            jobs[current].path = url; lastBook = url
+                            jobs[current].path = url; completedBooks.append(url)
                         }
                         jobs[current].backup = result.backup
                         if let metadata = result.metadata { apply(metadata, at: current) }
@@ -134,7 +137,8 @@ final class DownloadModel: ObservableObject {
                 runner = nil; isFinalizing = false
             }
             isRunning = false; task = nil
-            if let lastBook { readyURL = lastBook }
+            readyURL = completedBooks.last
+            readyURLs = completedBooks
         }
     }
 
@@ -161,6 +165,7 @@ final class DownloadModel: ObservableObject {
     func retrySelected() {
         guard !isRunning, let index = jobs.firstIndex(where: { $0.id == selected }), ["Failed", "Cancelled"].contains(jobs[index].state) else { return }
         jobs[index].request.ini = ini; jobs[index].request.adult = adult
+        jobs[index].request.source_kind = jobs[index].request.operation == "download" ? sourceKind : "story"
         jobs[index].state = "Queued"; jobs[index].progress = nil; jobs[index].message = ""
         start()
     }

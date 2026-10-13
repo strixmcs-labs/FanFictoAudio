@@ -5,7 +5,7 @@ import Testing
 struct DownloadTests {
     @Test func validatesStoryURLsAndPreservesChapterRanges() throws {
         #expect(try StoryLinks.parse("# comment\nhttps://example.com/story[1-5]\nhttps://example.com/story[1-5]\nhttp://other.example/2") == ["https://example.com/story[1-5]", "http://other.example/2"])
-        for text in ["", "file:///etc/passwd", "https://", "https://example.com/1 https://example.com/2"] {
+        for text in ["", "file:///etc/passwd", "https://", "https://example.com/1 https://example.com/2", "https://user:password@example.com/book.epub"] {
             #expect(throws: (any Error).self) { try StoryLinks.parse(text) }
         }
     }

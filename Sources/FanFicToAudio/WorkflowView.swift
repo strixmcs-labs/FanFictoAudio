@@ -10,7 +10,7 @@ struct WorkflowView: View {
                 Label("FanFic to Audio", systemImage: "book.fill").font(.headline)
                 Spacer()
                 Picker("Workflow", selection: $audio.stage) {
-                    Text("1 · Download EPUB").tag(0)
+                    Text("1 · Download by Link").tag(0)
                     Text("2 · Create Audiobook").tag(1)
                 }.pickerStyle(.segmented).frame(width: 370)
                 Spacer()
@@ -23,13 +23,14 @@ struct WorkflowView: View {
                 ContentView(model: audio)
             }
         }
+        .background(Color.white).tint(AppTheme.oxblood)
         .onChange(of: download.isRunning) { _, value in
             audio.downloadInProgress = value
             if value { audio.stopPreview() }
         }
-        .onChange(of: download.readyURL) { _, url in
+        .onChange(of: download.readyURLs) { _, urls in
             audio.downloadInProgress = download.isRunning
-            if let url { open(url) }
+            if !urls.isEmpty { audio.addToAudiobookQueue(urls) }
         }
     }
 

@@ -1,6 +1,6 @@
 # Privacy and data handling
 
-This describes version 1.3.0 of FanFic to Audio. The app has no application analytics or telemetry implementation and no developer-operated backend.
+This describes version 1.4.0 of FanFic to Audio. The app has no application analytics or telemetry implementation and no developer-operated backend.
 
 For Dr. Matt Booth's handling of support correspondence, contributions, and privacy requests, see the [Publisher Privacy Policy](https://github.com/thatosxguy/policies/blob/main/PRIVACY-POLICY.md). The project's [Terms of Service](https://github.com/thatosxguy/policies/blob/main/TERMS-OF-SERVICE.md) preserve its open-source license rights. Contact [admin@strixmcs.com](mailto:admin@strixmcs.com) for privacy questions.
 
@@ -13,13 +13,14 @@ For Dr. Matt Booth's handling of support correspondence, contributions, and priv
 - The audiobook queue, per-book narration presets (without keys), selected row, and AI usage totals are saved under `~/Library/Application Support/FanFicToAudio`. UserDefaults also stores budget limits and estimated per-model rates. Usage totals contain counts and estimated costs, not text or credentials.
 - Completed narration passages and checksums are saved in that directory's `Checkpoints` folder for resume. They contain generated audio of the story and are retained after cancellation/failure. Matching checkpoints are deleted after successful publication; removing a queue row or selecting **Discard Saved Passages** deletes that job's checkpoints. Other checkpoints can be deleted manually while idle.
 - The download queue and book previews last for the app session. EPUB text and downloader session data use bounded in-memory caches. Job requests and generated audio use temporary files, with normal completion/cancellation cleanup; a process crash can leave temporary files behind.
-- The app is not built with the macOS App Sandbox. It can access user-selected files and run its helper, `say`, and the FFmpeg executable you select.
+- The app is not built with the macOS App Sandbox. It can access user-selected files and run its helper, `say`, and its bundled FFmpeg executable (or an explicit override).
 
 ## Network behavior
 
 | Action | External destination / data |
 | --- | --- |
 | Download, update, metadata preview, or extract links | The selected website and resources through FanFicFare; configured site authentication may be sent there |
+| Direct EPUB download | The supplied URL and redirects; no INI credentials, browser cookies, ambient `.netrc`, or proxy settings are loaded by this transfer |
 | Narrate or preview using macOS voices | Local speech generation; the app makes no speech-provider request |
 | Narrate or preview using OpenAI | Book passages and narration settings to OpenAI's speech endpoint, authenticated with your key |
 | Narrate or preview using ElevenLabs | Book passages and voice/model settings to ElevenLabs' speech endpoint, authenticated with your key |
