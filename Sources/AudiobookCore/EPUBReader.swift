@@ -79,11 +79,20 @@ public enum EPUBReader {
             let chapterTitle = [labels[item.path], heading.map(normalized)].compactMap { $0 }.first(where: { !$0.isEmpty }) ?? "Section \(index + 1)"
             let isNavigation = item.properties.split(separator: " ").contains("nav")
             chapters.append(BookChapter(id: "\(index):\(id)", title: chapterTitle, text: text,
-                                        includedByDefault: ref.attr("linear") != "no" && !isNavigation))
+                                        includedByDefault: ref.attr("linear") != "no" && !isNavigation,
+                                        textWithoutFootnotes: readableText(body, skipFootnotes: true),
+                                        isFrontMatter: isNavigation || isFrontMatter(body, title: chapterTitle)))
         }
         guard !chapters.isEmpty else { throw AudiobookError.invalidEPUB("This EPUB has no readable text in its reading order. Scanned pages cannot be narrated.") }
+        var cover: Data?
+        let legacyCoverID = try package.nodes(forXPath: "//*[local-name()='metadata']/*[local-name()='meta' and @name='cover']/@content").first?.stringValue
+        if let image = items.values.first(where: { $0.properties.split(separator: " ").contains("cover-image") }) ?? legacyCoverID.flatMap({ items[$0] }),
+           ["image/jpeg", "image/png"].contains(image.type) {
+            do { cover = try archive.read(image.path) }
+            catch { warnings.append("Cover artwork could not be read.") }
+        }
         return EPUBBook(title: title.isEmpty ? url.deletingPathExtension().lastPathComponent : title,
-                        author: author, language: language, chapters: chapters, source: url, warnings: warnings)
+                        author: author, language: language, chapters: chapters, source: url, warnings: warnings, cover: cover)
     }
 
     static func resolve(_ href: String, relativeTo document: String) throws -> String {
@@ -115,7 +124,7 @@ public enum EPUBReader {
 
     static func normalized(_ text: String) -> String { text.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ") }
 
-    static func readableText(_ node: XMLNode) -> String {
+    static func readableText(_ node: XMLNode, skipFootnotes: Bool = false) -> String {
         let skipped: Set<String> = ["script", "style", "head", "noscript", "svg"]
         let blocks: Set<String> = ["p", "div", "section", "article", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "tr", "dt", "dd", "pre", "hr"]
         var output = ""
@@ -123,6 +132,11 @@ public enum EPUBReader {
             if node.kind == .text { output += node.stringValue ?? ""; return }
             let name = (node.localName ?? node.name ?? "").lowercased()
             guard !skipped.contains(name) else { return }
+            if skipFootnotes, let element = node as? XMLElement {
+                let types = (element.attributes ?? []).filter { $0.localName == "type" || $0.name == "role" }
+                    .compactMap(\.stringValue).joined(separator: " ").split(separator: " ").map(String.init)
+                if !Set(types).isDisjoint(with: ["footnote", "endnote", "noteref", "doc-footnote", "doc-endnote", "doc-noteref"]) { return }
+            }
             if let element = node as? XMLElement,
                element.attr("hidden") != nil || element.attr("aria-hidden") == "true" { return }
             if name == "br" { output += "\n"; return }
@@ -135,6 +149,23 @@ public enum EPUBReader {
         // Speech-control markup in a book must remain prose, not instructions to say.
         output = output.replacingOccurrences(of: "[[", with: "[ [").replacingOccurrences(of: "]]", with: "] ]")
         return output.components(separatedBy: .newlines).map(normalized).filter { !$0.isEmpty }.joined(separator: "\n\n")
+    }
+
+    static func isFrontMatter(_ node: XMLNode, title: String) -> Bool {
+        let names: Set<String> = ["frontmatter", "cover", "titlepage", "copyright-page", "dedication", "foreword", "preface", "acknowledgments", "toc"]
+        let sections = (try? node.nodes(forXPath: "./*[local-name()='section']")) ?? []
+        let elements: [XMLNode] = sections.count == 1 ? [node, sections[0]] : [node]
+        let semanticTypes = ((try? node.nodes(forXPath: ".//@*[local-name()='type']")) ?? [])
+            .compactMap(\.stringValue).flatMap { $0.split(whereSeparator: { $0.isWhitespace }).map(String.init) }
+        let hasBodyMatter = !Set(semanticTypes).isDisjoint(with: ["chapter", "bodymatter"])
+        if !hasBodyMatter {
+            for element in elements {
+                let types = (element as? XMLElement)?.attributes?.filter { $0.localName == "type" }.compactMap(\.stringValue)
+                    .joined(separator: " ").split(separator: " ").map(String.init) ?? []
+                if !Set(types).isDisjoint(with: names) { return true }
+            }
+        }
+        return !hasBodyMatter && ["title page", "copyright", "contents", "table of contents", "cover", "dedication", "foreword", "preface", "acknowledgments"].contains(title.lowercased())
     }
 }
 

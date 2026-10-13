@@ -26,6 +26,7 @@ struct ContentView: View {
                         emptyState
                         narrationSettings
                     }
+                    queueSection
                 }
                 .padding(32)
                 .frame(maxWidth: 900, alignment: .leading)
@@ -162,7 +163,38 @@ struct ContentView: View {
             HStack(spacing: 12) {
                 Text("Speed").font(.callout)
                 Slider(value: $model.rate, in: SpeechRate.sliderRange, step: 5).accessibilityLabel("Speaking speed in words per minute")
-                Text("\(Int(model.rate)) wpm").font(.system(.callout, design: .monospaced)).frame(width: 88, alignment: .trailing)
+                TextField("WPM", value: $model.rate, format: .number.precision(.fractionLength(0)))
+                    .textFieldStyle(.roundedBorder).frame(width: 72).accessibilityLabel("Exact words per minute")
+                    .onSubmit { model.rate = min(1000, max(80, model.rate.isFinite ? model.rate : 175)) }
+                Text("wpm").font(.caption)
+            }
+            HStack {
+                Text("Chapter pause")
+                Slider(value: $model.narration.chapterPause, in: 0...10, step: 0.1)
+                Text("\(model.narration.chapterPause, specifier: "%.1f") s").monospacedDigit().frame(width: 48)
+            }
+            Toggle("Skip front matter", isOn: $model.narration.skipFrontMatter)
+            Toggle("Skip marked footnotes and note references", isOn: $model.narration.skipFootnotes)
+            DisclosureGroup("Pronunciation rules") {
+                VStack(alignment: .leading) {
+                    ForEach($model.narration.pronunciations) { $rule in
+                        HStack {
+                            TextField("Written word", text: $rule.word)
+                            Image(systemName: "arrow.right")
+                            TextField("Say as", text: $rule.spokenAs)
+                            Button { model.narration.pronunciations.removeAll { $0.id == rule.id } } label: { Image(systemName: "minus.circle") }
+                        }
+                    }
+                    Button("Add Rule") { model.narration.pronunciations.append(PronunciationRule(word: "", spokenAs: "")) }
+                    Text("Matches whole words, ignoring case. Preview includes these substitutions.").font(.caption).foregroundStyle(.secondary)
+                }.textFieldStyle(.roundedBorder).padding(.top, 8)
+            }
+            HStack {
+                TextField("Preset name", text: $model.presetName).textFieldStyle(.roundedBorder)
+                Button("Save Preset", action: model.savePreset).disabled(model.presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Menu("Load Preset") {
+                    ForEach(model.savedPresets) { preset in Button(preset.name) { model.applyPreset(preset.id) } }
+                }.disabled(model.savedPresets.isEmpty)
             }
             Text("Preview reads the selected section. Download more voices in macOS System Settings.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -182,7 +214,7 @@ struct ContentView: View {
                     Text(chapter.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 ScrollView {
-                    Text(String(chapter.text.prefix(8000))).font(.system(size: 14, design: .serif)).lineSpacing(5)
+                    Text(String(model.narration.text(for: chapter).prefix(8000))).font(.system(size: 14, design: .serif)).lineSpacing(5)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(height: 125)
                 if chapter.text.count > 8000 { Text("Showing the first part of this section. Export includes its full text.").font(.caption2).foregroundStyle(.secondary) }
@@ -215,8 +247,9 @@ struct ContentView: View {
                 HStack {
                     Text(model.status).font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button("Cancel", action: model.cancelExport)
+                    Button("Pause", action: model.cancelExport)
                 }
+                if let remaining = model.remainingTime { Text(remaining).font(.caption).foregroundStyle(.secondary) }
             } else {
                 HStack {
                     if model.exportedURL != nil {
@@ -231,6 +264,12 @@ struct ContentView: View {
             Text("Estimated length is the listening time. Conversion time depends on the voice and book. Your Mac stays awake while exporting.")
                 .font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    private var queueSection: some View {
+        let addCurrent: (() -> Void)? = model.book == nil ? nil : { model.addCurrentToQueue() }
+        return QueueView(queue: model.queue, addBooks: { model.addBooksToQueue() }, addCurrent: addCurrent,
+                         start: { model.startQueue() }, encoderAvailable: model.ffmpeg != nil, preset: model.currentPreset)
     }
 
     private func acceptDrop(_ providers: [NSItemProvider]) -> Bool {

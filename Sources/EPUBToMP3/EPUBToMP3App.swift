@@ -28,8 +28,8 @@ struct EPUBToMP3App: App {
         }
         Settings {
             VStack(alignment: .leading, spacing: 16) {
-                Text("MP3 encoder").font(.title2.bold())
-                Text("Speech uses the voices installed on your Mac. FFmpeg converts the resulting audio to MP3.")
+                Text("Audiobook encoder").font(.title2.bold())
+                Text("A standalone FFmpeg encoder is bundled for MP3 and M4B export. Speech uses the voices installed on your Mac.")
                 Text(model.ffmpeg?.path ?? "FFmpeg was not found.").font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                 Button("Choose FFmpeg…", action: model.chooseFFmpeg).disabled(model.busy)
                 Link("FFmpeg installation options", destination: URL(string: "https://ffmpeg.org/download.html#build-mac")!)

@@ -1,7 +1,10 @@
 .build/
 dist/
 .DS_Store
+__pycache__/
 *.epub
 *.mp3
 *.aiff
 *.wav
+*.m4b
+*.flac
