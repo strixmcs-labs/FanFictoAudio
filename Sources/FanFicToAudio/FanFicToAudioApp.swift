@@ -11,6 +11,7 @@ struct FanFicToAudioApp: App {
         Window("FanFic to Audio", id: "main") {
             WorkflowView(audio: model, download: download)
                 .frame(minWidth: 1060, minHeight: 700)
+                .preferredColorScheme(.light)
                 .task {
                     delegate.model = model
                     delegate.download = download
@@ -32,8 +33,8 @@ struct FanFicToAudioApp: App {
         }
         Settings {
             VStack(alignment: .leading, spacing: 16) {
-                Text("MP3 encoder").font(.title2.bold())
-                Text("Speech uses the voices installed on your Mac. FFmpeg converts the resulting audio to MP3.")
+                Text("Audiobook encoder").font(.title2.bold())
+                Text("macOS voices narrate your EPUBs. A standalone FFmpeg encoder is bundled for MP3 and M4B output.")
                 Text(model.ffmpeg?.path ?? "FFmpeg was not found.").font(.system(.caption, design: .monospaced)).textSelection(.enabled)
                 Button("Choose FFmpeg…", action: model.chooseFFmpeg).disabled(model.busy)
                 Link("FFmpeg installation options", destination: URL(string: "https://ffmpeg.org/download.html#build-mac")!)
@@ -42,7 +43,7 @@ struct FanFicToAudioApp: App {
                 Text("Download voices in System Settings → Accessibility → Read & Speak (called Spoken Content on earlier macOS versions). Then refresh the voice list.")
                 Button("Refresh Voices") { Task { await model.loadVoices() } }.disabled(model.busy || model.isPreviewing)
             }
-            .padding(24).frame(width: 470)
+            .padding(24).frame(width: 470).background(Color.white).tint(AppTheme.oxblood).preferredColorScheme(.light)
         }
     }
 }

@@ -25,13 +25,14 @@ def main():
     try:
         with redirect_stdout(sys.stderr):
             from fanficfare_gui.engine import execute
+            from fanficfare_gui.link_download import download_link
             from fanficfare_gui.session import Session
             request = json.loads(args.request.read_text(encoding="utf-8"))
             if request.get("format", "epub") != "epub":
                 raise ValueError("This audiobook app downloads EPUB files.")
             session = Session()
             try:
-                result = execute(request, emit, session)
+                result = download_link(request, emit, session) if request["operation"] == "download" else execute(request, emit, session)
             finally:
                 session.close()
         emit({"type": "result", **result})

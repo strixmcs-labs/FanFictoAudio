@@ -8,6 +8,7 @@ public struct DownloadRequest: Codable, Sendable {
     public var ini: String?
     public var adult: Bool
     public var work_dir: String?
+    public var source_kind = "auto"
 
     public init(operation: String = "download", source: String, output: String, ini: String? = nil, adult: Bool = false) {
         self.operation = operation; self.source = source; self.output = output
@@ -41,8 +42,8 @@ public enum StoryLinks {
             let value = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if value.isEmpty || value.hasPrefix("#") { return nil }
             guard value.range(of: #"^https?://[^\s]+$"#, options: [.regularExpression, .caseInsensitive]) != nil,
-                  let url = URL(string: value), let host = url.host, !host.isEmpty else {
-                throw DownloadError.message("Enter one complete http or https story URL per line.")
+                  let url = URL(string: value), let host = url.host, !host.isEmpty, url.user == nil, url.password == nil else {
+                throw DownloadError.message("Enter one complete http or https story or EPUB URL per line, without embedded login credentials.")
             }
             return seen.insert(value).inserted ? value : nil
         }

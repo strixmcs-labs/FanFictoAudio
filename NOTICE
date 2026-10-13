@@ -23,4 +23,4 @@ interface using the separately maintained FanFicFare engine and its adapters.
 Python, FanFicFare, and their bundled dependencies retain their respective
 licenses. Their license notices are included in the packaged application's
 Contents/Resources/ThirdPartyNotices and Downloader directories.
-FFmpeg is detected locally and is not bundled.
+A standalone FFmpeg 8.1.2 encoder with LAME 3.100 is bundled. Its LGPL licenses, exact source archives, checksums, and build script are included in EncoderLicenses and EncoderSources. Network and GPL/nonfree components are disabled.

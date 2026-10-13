@@ -39,6 +39,7 @@ subprocess.run([str(args.cli), "inspect", str(book)], check=True, timeout=30)
 for mode in ("single", "chapters", "m4b"):
     destination = work / ("Downloaded Story.mp3" if mode == "single" else "Downloaded Story.m4b" if mode == "m4b" else "Downloaded Story Chapters")
     command = [str(args.cli), "export", str(book), str(destination), "--rate", "1000", "--bitrate", "192"]
+    command.extend(["--ffmpeg", str(args.app / "Contents/Resources/ffmpeg")])
     if args.voice: command.extend(["--voice", args.voice])
     if mode == "chapters": command.append("--chapters")
     if mode == "m4b": command.append("--m4b")

@@ -5,7 +5,7 @@ import AudiobookCore
 struct AudiobookQueueView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var queue: AudiobookQueue
-    private let accent = Color(red: 0.24, green: 0.43, blue: 0.48)
+    private let accent = AppTheme.oxblood
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -151,6 +151,6 @@ struct AudiobookQueueView: View {
             }
             Text("Select a row to open its EPUB, or drag rows into reading order. During conversion, the open book follows the active job. Retry resumes completed passages when the content and settings match. Removing a book discards its saved passages.")
                 .font(.caption2).foregroundStyle(.secondary)
-        }.padding(20).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
     }
 }

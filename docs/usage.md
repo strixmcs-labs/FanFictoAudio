@@ -4,10 +4,10 @@
 
 ## Download a story and create an audiobook
 
-1. Paste one story URL per line in **Download EPUB**.
+1. Paste one story page or direct EPUB URL per line in **Download by Link**. Keep **Detect automatically**, or choose **Story page** / **Direct EPUB** explicitly for unusual links.
 2. Choose where to save your EPUBs. If the site needs login credentials or cookies, select your `personal.ini`. Adult access is an explicit session choice.
-3. Click **Download & Prepare Audiobook**. The last successful EPUB opens automatically in **Create Audiobook** when the queue finishes. To narrate another downloaded story, select its queue row and click **Make Audiobook**.
-4. Review the chapters and text preview. Choose macOS, OpenAI, or ElevenLabs narration, a voice, speed, audio output mode, and bitrate. **Preview** reads a short sample.
+3. Click **Download & Prepare Audiobook**. Every successful EPUB is added to the saved audiobook queue in download order. The last one opens for review when the batch finishes. To narrate another downloaded story, select its queue row and click **Make Audiobook**.
+4. Review the chapters and text preview. Choose macOS, OpenAI, or ElevenLabs narration, a voice, speed, audio output mode, and bitrate. Enter an exact macOS narration rate or use the slider (**80–1,000 WPM**). Actual delivery depends on the selected voice. **Preview** reads a short sample.
 5. Click **Create Audiobook…** and choose a new destination. Export one MP3, a folder of numbered chapter MP3s, or an M4B with chapter markers and embedded EPUB cover art when available.
 
 You can also open an existing EPUB directly into the audiobook view. Dropped EPUBs are added to the audiobook queue. **Open EPUB…** in the toolbar and Command-O work from either step.
@@ -67,7 +67,7 @@ The companion CLI includes `benchmark-read BOOK.epub` for comparing 20 fresh rea
 
 - **Add to Queue** collects several jobs before you run them. Jobs run sequentially, preserving each site's own request delays. A failed story does not prevent later queued stories from downloading.
 - **Preview story** reads metadata without saving an EPUB.
-- **Find links on a page** returns links to the input box for review. Switch the action back to **Download EPUB** before downloading them.
+- **Find links on a page** returns links to the input box for review. Switch the action back to **Download by Link** before downloading them.
 - **Update Existing EPUBs…** updates FanFicFare books and backs up originals to **FanFicFare Backups** beside each book. Books with no new chapters stay unchanged.
 - **Cancel & Pause Queue** stops the active download and cleans partial work. **Start Queue** resumes remaining jobs. **Retry Selected** retries a failed or cancelled job using the current INI and adult-access choices.
 - Successful downloads never overwrite existing filenames. The app acknowledges a complete, validated EPUB before the helper publishes it. Cancellation is disabled briefly while the book is saved.
@@ -79,8 +79,10 @@ The companion CLI includes `benchmark-read BOOK.epub` for comparing 20 fresh rea
 
 For local narration, the app uses speech voices exposed by macOS `/usr/bin/say`. More voices can be downloaded in System Settings under Accessibility. Refresh them from this app's Settings afterward. Voice availability depends on what `say` exposes.
 
-MP3 encoding uses **FFmpeg with libmp3lame**; M4B uses its **AAC** encoder. FFmpeg is detected in standard Homebrew and MacPorts locations or can be selected in Settings. FFmpeg is not bundled.
+MP3 encoding uses **FFmpeg with libmp3lame**; M4B uses its **AAC** encoder. A standalone FFmpeg encoder is bundled. An alternative compatible encoder can be selected in Settings.
 
 Only unprotected, text-based EPUBs can be narrated. Image-only books need OCR, which is not included. A section follows a document in the EPUB spine; title pages can be unchecked before export. MP3 output has title/author metadata. Combined MP3s have no embedded chapter markers; use **M4B with chapters** or separate chapter files for navigation. M4B preserves JPEG/PNG cover art designated in EPUB 2/3 metadata; unsupported or absent covers are omitted. macOS narration and MP3 encoding run locally; AI speech generation uses the selected provider.
 
 Exports preserve existing files, prevent idle system sleep, and clean temporary staging on cancellation while retaining completed resume passages. Quitting waits for safe downloader publication or cancellation and audiobook cleanup. Downloading and audiobook conversion run as separate workflow steps.
+
+Direct EPUB downloads use bounded streaming, validate ZIP/XML and the reading order before publication, and retain existing files with numbered names. They support HTTP/HTTPS links and redirects; direct downloads do not inherit browser login sessions or the selected story-site INI.

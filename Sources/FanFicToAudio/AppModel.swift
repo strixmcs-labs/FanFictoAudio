@@ -14,8 +14,13 @@ final class AppModel: ObservableObject {
     @Published var voice = UserDefaults.standard.string(forKey: "selectedVoice") ?? "" {
         didSet { UserDefaults.standard.set(voice, forKey: "selectedVoice") }
     }
-    @Published var rate = UserDefaults.standard.object(forKey: "speakingRate") as? Double ?? 175 {
-        didSet { UserDefaults.standard.set(rate, forKey: "speakingRate") }
+    @Published private var storedRate = SpeechRate.normalized(UserDefaults.standard.object(forKey: "speakingRate") as? Double ?? 175)
+    var rate: Double {
+        get { storedRate }
+        set {
+            storedRate = SpeechRate.normalized(newValue)
+            UserDefaults.standard.set(storedRate, forKey: "speakingRate")
+        }
     }
     @Published var bitrate = UserDefaults.standard.object(forKey: "mp3Bitrate") as? Int ?? 128 {
         didSet { UserDefaults.standard.set(bitrate, forKey: "mp3Bitrate") }
@@ -109,7 +114,7 @@ final class AppModel: ObservableObject {
         }
         if let id = audiobookQueue.selectedID ?? audiobookQueue.jobs.first?.id {
             selectedQueueJob = id
-            if let job = audiobookQueue.jobs.first(where: { $0.id == id }) { loadBook(job.source, chapterIDs: job.chapterIDs, queueID: id) }
+            if let job = audiobookQueue.jobs.first(where: { $0.id == id }) { loadBook(job.source, chapterIDs: job.chapterIDs, queueID: id, showAudiobook: false) }
         }
         refreshUsage()
         queueObservation = audiobookQueue.objectWillChange.sink { [weak self] _ in
@@ -215,7 +220,7 @@ final class AppModel: ObservableObject {
         loadBook(url)
     }
 
-    func loadBook(_ url: URL, chapterIDs: Set<String>? = nil, queueID: UUID? = nil) {
+    func loadBook(_ url: URL, chapterIDs: Set<String>? = nil, queueID: UUID? = nil, showAudiobook: Bool = true) {
         guard !isExporting, !downloadInProgress, !isCombining, !audiobookQueue.isRunning else { return }
         if queueID == nil { selectedQueueJob = nil }
         stopPreview()
@@ -228,18 +233,20 @@ final class AppModel: ObservableObject {
                 let loaded = try await EPUBLibrary.shared.read(url)
                 try Task.checkCancellation()
                 guard generation == loadGeneration else { return }
-                applyBook(loaded, chapterIDs: chapterIDs)
+                applyBook(loaded, chapterIDs: chapterIDs, showAudiobook: showAudiobook)
                 if let queueID { audiobookQueue.updateMetadata(queueID, book: loaded) }
             } catch is CancellationError {} catch {
                 guard generation == loadGeneration else { return }
-                errorMessage = error.localizedDescription; status = "This EPUB could not be opened."
+                if showAudiobook { errorMessage = error.localizedDescription }
+                status = showAudiobook ? "This EPUB could not be opened." : "The saved EPUB is unavailable. Choose another book or download a link."
             }
             if generation == loadGeneration { isLoading = false; loadTask = nil }
         }
     }
 
-    private func applyBook(_ loaded: EPUBBook, chapterIDs: Set<String>? = nil) {
-        book = loaded; stage = 1; exportedURL = nil
+    private func applyBook(_ loaded: EPUBBook, chapterIDs: Set<String>? = nil, showAudiobook: Bool = true) {
+        book = loaded; exportedURL = nil
+        if showAudiobook { stage = 1 }
         selectedChapters = chapterIDs ?? Set(loaded.chapters.filter(\.includedByDefault).map(\.id))
         focusedChapter = loaded.chapters.first?.id; status = "Ready to narrate."
     }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 — 2026-10-12
+
+- Accept supported story pages and direct EPUB links in one Download by Link flow, including redirects and opaque EPUB endpoints.
+- Stream and bound EPUB transfers; validate ZIP integrity, XML, and reading-order resources before atomic publication.
+- Add every successful batch download to the saved audiobook queue in order, preserving failed-job retry and existing outputs.
+- Bundle a standalone MP3/AAC encoder with pinned sources and license notices; remove the separate FFmpeg installation requirement.
+- Keep white backgrounds and use oxblood accents with a matching app icon across downloading and narration.
+- Add exact, bounded 80–1,000 WPM input without recursive value observers.
+- Open on Download by Link even when a restored queue book has moved; preserve queue entries without a blocking startup alert.
+- Preserve existing site settings, local narration, resumable queues, series merging, and optional AI providers.
+
 ## 1.3.0 — 2026-10-06
 
 - Save audiobook queue order, selections, states, and credential-free per-book narration settings across launches.

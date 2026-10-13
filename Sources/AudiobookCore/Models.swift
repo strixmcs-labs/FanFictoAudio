@@ -73,6 +73,9 @@ public enum ExportMode: String, CaseIterable, Identifiable, Sendable, Codable {
 }
 
 public enum SpeechRate {
+    public static func normalized(_ value: Double) -> Double {
+        min(Double(allowedRange.upperBound), max(Double(allowedRange.lowerBound), value.isFinite ? value.rounded() : 175))
+    }
     public static let allowedRange = 80...1000
     public static var sliderRange: ClosedRange<Double> {
         Double(allowedRange.lowerBound)...Double(allowedRange.upperBound)

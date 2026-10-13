@@ -9,13 +9,13 @@ Download fanfiction as EPUB, then turn it into an audiobook in one native Mac ap
 
 **[Download the macOS app](https://github.com/thatosxguy/FanFictoAudio/releases/latest)** · **[Installation guide](docs/installation.md)** · **[User guide](docs/usage.md)**
 
-The packaged app requires **Apple silicon and macOS 14 or later**. Python and FanFicFare are included. Audio creation requires a separate **FFmpeg installation with libmp3lame and AAC**, including when using AI narration. Check the selected release notes for its signing and notarization status; see the installation guide before opening it.
+The packaged app requires **Apple silicon and macOS 14 or later**. Python and FanFicFare are included. A standalone FFmpeg encoder with MP3 and AAC support is included, so no separate FFmpeg installation is needed. Check the selected release notes for its signing and notarization status; see the installation guide before opening it.
 
-Version 1.3 adds a saved, resumable audiobook queue, per-book settings, AI usage budgets, and M4B chapter navigation with cover art. Developer builds support Developer ID signing (including a YubiKey) and Apple notarization.
+Version 1.4 adds automatic story/direct-EPUB link downloading, hands every completed download to the saved audiobook queue, bundles the audio encoder, and keeps white backgrounds with oxblood accents. Version 1.3 introduced a saved, resumable audiobook queue, per-book settings, AI usage budgets, and M4B chapter navigation with cover art. Developer builds support Developer ID signing (including a YubiKey) and Apple notarization.
 
 ## What it does
 
-- Download stories as EPUB, preview metadata, find story links, and update existing FanFicFare books with backups.
+- Download story pages or direct EPUB links, preview story metadata, find story links, and update existing FanFicFare books with backups.
 - Add several EPUBs at once, reorder the audiobook queue, pause it, and retry unsuccessful jobs.
 - Follow the selected or active queue item in the open-book preview.
 - Combine separate EPUBs into an ordered series without changing the originals.
@@ -25,7 +25,9 @@ Version 1.3 adds a saved, resumable audiobook queue, per-book settings, AI usage
 
 ```mermaid
 flowchart LR
-    URL[Story URLs] --> FFF[FanFicFare downloader]
+    URL[Story page URLs] --> FFF[FanFicFare downloader]
+    LINK[Direct EPUB URLs] --> TRANSFER[EPUB download]
+    TRANSFER --> EPUB
     FFF --> EPUB[EPUB files]
     DISK[Existing EPUBs] --> EPUB
     EPUB --> QUEUE[Audiobook queue]
@@ -39,8 +41,8 @@ flowchart LR
 
 ## Get started
 
-1. Install the app and FFmpeg following the [installation guide](docs/installation.md).
-2. Paste a story URL in **Download EPUB**, select a destination, then click **Download & Prepare Audiobook**. Or open an existing EPUB with **Open EPUB…** / Command-O.
+1. Install the app following the [installation guide](docs/installation.md).
+2. Paste a story page or direct EPUB URL in **Download by Link**, select a destination, then click **Download & Prepare Audiobook**. Or open an existing EPUB with **Open EPUB…** / Command-O.
 3. Review the sections, select a speech provider and voice, and create an audiobook.
 4. For a batch, use **Add EPUBs…**, arrange the queue, then **Create Queued Audiobooks…**. To make one series, select waiting EPUBs, enter its title, and **Combine Selected EPUBs…** first.
 
@@ -85,4 +87,4 @@ Thank you to **Jim Miller (JimmXinu) and all FanFicFare contributors** for [FanF
 
 FanFic to Audio is an independent application and is not an official FanFicFare release. This project's native interface and integration are licensed under [Apache 2.0](LICENSE). The bundled FanFicFare Python engine is also licensed under Apache 2.0; its separately distributed Calibre plugin is GPLv3 and is not bundled here.
 
-The app also includes downloader interface modules from FanFicFare Desktop and EPUB narration components from the EPUB to MP3 project. FanFicFare and other dependencies retain their original copyright and license notices, which ship inside the app. FFmpeg and Qt are not bundled. See [NOTICE](NOTICE).
+The app also includes downloader interface modules from FanFicFare Desktop and EPUB narration components from the EPUB to MP3 project. FanFicFare and other dependencies retain their original copyright and license notices, which ship inside the app. The bundled standalone FFmpeg/LAME encoder includes its source archives and license notices; Qt is not bundled. See [NOTICE](NOTICE).

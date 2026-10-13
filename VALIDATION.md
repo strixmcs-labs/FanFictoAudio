@@ -1,8 +1,24 @@
 # Validation
 
-Last checked: October 6, 2026. Candidate: **1.3.0**, build **4**.
+Last checked: October 12, 2026. Candidate: **1.4.0**, build **5**.
 
-## Version 1.3 checks
+## Version 1.4 checks
+
+- **51 native tests passed**: 43 audiobook tests, 5 download-bridge tests, and 3 app-model tests. **50 Python tests passed**, with two upstream deprecation warnings.
+- Direct-link regressions use a local HTTP server and authored EPUBs: redirects, opaque endpoints, duplicate preservation, HTTP/HTML rejection, missing chapters, advertised/streaming size limits, compressed resource limits, entity rejection, standard XHTML DOCTYPE acceptance, and publication acknowledgement failure. Existing offline FanFicFare story downloads still pass.
+- Exact WPM normalization and missing restored-book startup behavior have native regression coverage. Queue entries remain intact when their source is unavailable.
+- The native GUI downloaded an offline fixture story and a local direct EPUB in one batch, automatically queued both, and completed two MP3s using a macOS voice at 550 WPM / 192 kbps. FFprobe reported positive durations and both outputs decoded. Original user queue entries and preferences were restored after this isolated check.
+- A live public Project Gutenberg EPUB endpoint downloaded through the packaged helper using automatic detection, passed archive/package validation, and opened in the native reader. Authenticated story sites and every supported site adapter were not exercised live.
+- The Developer ID signed bundle passed the packaged helper/local macOS narration smoke check for single MP3, chapter MP3s, and M4B, explicitly using its bundled encoder. Metadata, 192 kbps MP3 streams, durations, M4B chapters, and deep/strict signature verification passed.
+- A separate local M4B export verified attached cover art, three chapter boundaries, AAC audio, and nonzero decoded PCM through the bundled encoder.
+- All nested code and the app were signed with Developer ID Application, team `CF67T8RW6F`, hardened runtime, and secure timestamps. Apple accepted submission `ed432b24-7af8-4352-88a8-b83e6f23c144`; the ticket was stapled and validated, and Gatekeeper reported `source=Notarized Developer ID`.
+- The notarized build replaced the existing local Applications installation with the previous bundle preserved. Its ticket and Gatekeeper assessment passed after copying. A fresh GUI launch opened Download by Link with white/oxblood styling and no missing-book modal.
+- The release is Apple silicon / macOS 14 or later and bundles Python, FanFicFare, and the standalone FFmpeg/LAME encoder with matching sources and license notices. No separate runtime installation is required.
+- Live paid TTS calls, installation on another Mac, Intel packaging, and subjective narration quality were not verified. Older validation below is historical evidence, not a claim that every previous manual check was repeated.
+
+## Version 1.3 historical validation
+
+Checked October 6, 2026: version 1.3.0, build 4.
 
 - **49 native tests passed**: 43 audiobook tests, 5 download-bridge tests, and 1 application-model selection test. Parameterized bitrate/provider cases are included within those tests.
 - **36 Python tests passed**, with two upstream deprecation warnings. Its HTTP connection test uses a loopback server.

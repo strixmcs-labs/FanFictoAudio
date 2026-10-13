@@ -25,7 +25,9 @@ struct NarrationSettingsView: View {
                 HStack {
                     Text("Speed")
                     Slider(value: $model.rate, in: SpeechRate.sliderRange, step: 5).accessibilityLabel("Speaking speed in words per minute")
-                    Text("\(Int(model.rate)) wpm").monospacedDigit().frame(width: 88, alignment: .trailing)
+                    TextField("WPM", value: $model.rate, format: .number.precision(.fractionLength(0)))
+                        .textFieldStyle(.roundedBorder).frame(width: 72).accessibilityLabel("Exact words per minute")
+                    Text("wpm").font(.caption)
                 }
                 Text("Preview reads the selected section, or a short sample when no book is open. More voices are available in macOS System Settings.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -46,7 +48,7 @@ struct NarrationSettingsView: View {
                 Text("AI-generated voice. Preview and conversion send book text to \(model.provider.rawValue); API usage is billed by that provider.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-        }.padding(20).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
             .disabled(model.busy)
             .onChange(of: model.voice) { _, _ in model.stopPreview() }
             .onChange(of: model.rate) { _, _ in model.stopPreview() }

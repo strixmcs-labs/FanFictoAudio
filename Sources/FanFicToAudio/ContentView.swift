@@ -4,7 +4,7 @@ import AudiobookCore
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
-    private let accent = Color(red: 0.24, green: 0.43, blue: 0.48)
+    private let accent = AppTheme.oxblood
 
     var body: some View {
         HStack(spacing: 0) {
@@ -40,7 +40,7 @@ struct ContentView: View {
                 .frame(maxWidth: 900, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Color.white)
         }
         .tint(accent)
         .onDrop(of: [UTType.fileURL], isTargeted: $model.isDropTarget, perform: acceptDrop)
@@ -114,7 +114,7 @@ struct ContentView: View {
             Divider()
             Label(model.provider == .system ? "Narration on your Mac" : "AI narration via \(model.provider.rawValue)", systemImage: model.provider == .system ? "desktopcomputer" : "waveform").font(.caption).foregroundStyle(.secondary).padding(20)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Color.white)
     }
 
     private var outputSettings: some View {

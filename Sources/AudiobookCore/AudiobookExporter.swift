@@ -157,9 +157,9 @@ public enum AudiobookExporter {
         var args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-f", "concat", "-safe", "0", "-i", list.path,
                     "-f", "ffmetadata", "-i", metadata.path]
         if let cover = book.cover {
-            let image = work.appendingPathComponent("cover.image")
+            let image = work.appendingPathComponent(cover.starts(with: [0xff, 0xd8]) ? "cover.jpg" : "cover.png")
             try cover.write(to: image)
-            args += ["-i", image.path, "-map", "2:v:0", "-c:v", "mjpeg", "-disposition:v:0", "attached_pic"]
+            args += ["-f", "image2", "-pattern_type", "none", "-i", image.path, "-map", "2:v:0", "-c:v", "mjpeg", "-disposition:v:0", "attached_pic"]
         }
         args += ["-map", "0:a:0", "-c:a", "copy", "-map_metadata", "1", "-map_chapters", "1", "-movflags", "+faststart", "-f", "mp4"]
         for item in narrationMetadata(options) { args += ["-metadata", item] }
