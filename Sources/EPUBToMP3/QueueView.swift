@@ -43,7 +43,8 @@ struct QueueView: View {
                         Button("Use Current Narration Settings") { queue.updateNarration(job.id, preset: preset) }.disabled(job.state == .done)
                         Button("Remove", role: .destructive) { queue.remove(job.id) }
                     } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).frame(width: 24).disabled(queue.isRunning)
-                }.padding(10).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                }.padding(10).background(Color.white, in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.oxblood.opacity(0.12)).allowsHitTesting(false))
             }
             HStack {
                 Text(queue.summary).font(.caption).foregroundStyle(.secondary)

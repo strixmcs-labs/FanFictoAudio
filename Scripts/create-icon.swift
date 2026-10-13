@@ -16,8 +16,8 @@ func drawIcon(size: Int) throws -> Data {
     transform.scale(by: scale)
     transform.concat()
     let background = NSBezierPath(roundedRect: NSRect(x: 68, y: 68, width: 888, height: 888), xRadius: 205, yRadius: 205)
-    NSGradient(starting: NSColor(calibratedRed: 0.31, green: 0.56, blue: 0.59, alpha: 1),
-        ending: NSColor(calibratedRed: 0.12, green: 0.30, blue: 0.35, alpha: 1))!.draw(in: background, angle: -80)
+    NSGradient(starting: NSColor(calibratedRed: 143 / 255.0, green: 48 / 255.0, blue: 64 / 255.0, alpha: 1),
+        ending: NSColor(calibratedRed: 63 / 255.0, green: 7 / 255.0, blue: 21 / 255.0, alpha: 1))!.draw(in: background, angle: -80)
     let left = NSBezierPath()
     left.move(to: NSPoint(x: 220, y: 365)); left.line(to: NSPoint(x: 220, y: 720))
     left.curve(to: NSPoint(x: 492, y: 660), controlPoint1: NSPoint(x: 330, y: 748), controlPoint2: NSPoint(x: 420, y: 715))
@@ -38,7 +38,7 @@ func drawIcon(size: Int) throws -> Data {
         waveform.move(to: NSPoint(x: x, y: 518 - height / 2))
         waveform.line(to: NSPoint(x: x, y: 518 + height / 2))
     }
-    NSColor(calibratedRed: 0.22, green: 0.44, blue: 0.48, alpha: 1).setStroke(); waveform.stroke()
+    NSColor(calibratedRed: 101 / 255.0, green: 15 / 255.0, blue: 32 / 255.0, alpha: 1).setStroke(); waveform.stroke()
     NSGraphicsContext.restoreGraphicsState()
     return bitmap.representation(using: .png, properties: [:])!
 }

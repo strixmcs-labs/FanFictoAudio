@@ -4,7 +4,7 @@ import AudiobookCore
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
-    private let accent = Color(red: 0.24, green: 0.43, blue: 0.48)
+    private let accent = AppTheme.oxblood
 
     var body: some View {
         HStack(spacing: 0) {
@@ -32,7 +32,7 @@ struct ContentView: View {
                 .frame(maxWidth: 900, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Color.white)
         }
         .tint(accent)
         .onDrop(of: [UTType.fileURL], isTargeted: $model.isDropTarget, perform: acceptDrop)
@@ -98,7 +98,7 @@ struct ContentView: View {
                         .padding(.vertical, 5)
                         .tag(chapter.id)
                     }
-                }.listStyle(.sidebar)
+                }.listStyle(.sidebar).scrollContentBackground(.hidden).background(Color.white)
                 Text("Sections follow the EPUB spine. Navigation and non-linear extras start unchecked.")
                     .font(.caption2).foregroundStyle(.secondary).padding(20)
             } else {
@@ -110,7 +110,7 @@ struct ContentView: View {
             Divider()
             Label("Processed on your Mac", systemImage: "desktopcomputer").font(.caption).foregroundStyle(.secondary).padding(20)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(Color.white)
     }
 
     private var emptyState: some View {
@@ -123,13 +123,14 @@ struct ContentView: View {
             Text("Text-based EPUB 2 and 3 · DRM-free").font(.caption).foregroundStyle(.secondary)
         }
         .padding(32).frame(maxWidth: .infinity)
-        .background(accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(accent.opacity(0.14)).allowsHitTesting(false))
     }
 
     private func bookSummary(_ book: EPUBBook) -> some View {
         HStack(alignment: .top, spacing: 18) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10).fill(accent.gradient)
+                RoundedRectangle(cornerRadius: 10).fill(AppTheme.bookGradient)
                 Image(systemName: "book.closed.fill").font(.system(size: 32)).foregroundStyle(.white.opacity(0.85))
             }.frame(width: 68, height: 88).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
@@ -199,7 +200,8 @@ struct ContentView: View {
             Text("Preview reads the selected section. Download more voices in macOS System Settings.")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(20).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(accent.opacity(0.12)).allowsHitTesting(false))
         .disabled(model.busy)
         .onChange(of: model.voice) { _, _ in model.stopPreview() }
         .onChange(of: model.rate) { _, _ in model.stopPreview() }

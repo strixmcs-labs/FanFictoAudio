@@ -2,6 +2,7 @@
 
 ## 0.2.0
 
+- Keep white backgrounds with oxblood accents, wine-toned gradients, and a matching app icon.
 - Bundle a standalone, macOS 14-targeted FFmpeg encoder with source archives and license notices.
 - Add M4B output with embedded chapters and EPUB cover art; include cover art in MP3 exports.
 - Keep speech passages lossless until a single final encode, eliminating repeated MP3 encoding boundaries.

@@ -10,6 +10,7 @@ struct EPUBToMP3App: App {
         Window("EPUB to MP3", id: "main") {
             ContentView(model: model)
                 .frame(minWidth: 920, minHeight: 650)
+                .preferredColorScheme(.light)
                 .task {
                     delegate.model = model
                     await model.loadVoices()
@@ -38,7 +39,8 @@ struct EPUBToMP3App: App {
                 Text("Download voices in System Settings → Accessibility → Read & Speak (called Spoken Content on earlier macOS versions). Then refresh the voice list.")
                 Button("Refresh Voices") { Task { await model.loadVoices() } }.disabled(model.busy || model.isPreviewing)
             }
-            .padding(24).frame(width: 470)
+            .padding(24).frame(width: 470).background(Color.white)
+            .tint(AppTheme.oxblood).preferredColorScheme(.light)
         }
     }
 }
