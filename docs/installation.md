@@ -18,11 +18,11 @@ The app includes Python and FanFicFare. You do not need either original applicat
 ## Install the release
 
 1. Open [Releases](https://github.com/thatosxguy/FanFictoAudio/releases/latest).
-2. Download the app ZIP or DMG and its checksum file from the same release. Version 1.4 assets include the version and architecture in their names. GitHub's **Source code** ZIP is the source tree, not the ready-to-run app.
+2. Download the app ZIP or DMG and its checksum file from the same release. Release assets include the version and architecture in their names. GitHub's **Source code** ZIP is the source tree, not the ready-to-run app.
 3. Optionally verify the downloaded archive from the folder containing both files:
 
    ```sh
-   shasum -a 256 -c FanFic-to-Audio-1.4.0-macOS-arm64.sha256
+   shasum -a 256 -c FanFic-to-Audio-1.5.0-macOS-arm64.sha256
    ```
 
 4. Extract the ZIP or open the DMG, then drag **FanFic to Audio.app** into Applications. Keep the whole bundle intact.

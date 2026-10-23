@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.0 — Unreleased
+## 1.5.0 — 2026-10-23
 
 - Split **Create Audiobook** into **Voice & Text**, **Open Book**, and **Queue** panes, with a narration summary and **Change…** shortcut where books are exported.
 - Drag sections into a custom reading order, move them from a context menu, or restore the EPUB order. Rename sections for M4B chapters, chapter files, and read-aloud titles. Orders and titles are saved with queue entries.
