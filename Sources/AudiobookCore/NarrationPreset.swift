@@ -1,7 +1,7 @@
 import Foundation
 
 /// Safe to save with the queue. API credentials are deliberately absent.
-public struct NarrationPreset: Codable, Sendable {
+public struct NarrationPreset: Codable, Sendable, Equatable {
     public let provider: NarrationProvider
     public let model: String
     public let apiVoice: String
@@ -21,6 +21,13 @@ public struct NarrationPreset: Codable, Sendable {
         speed = api?.speed ?? 1; instructions = api?.instructions ?? ""
         self.voice = voice; self.wordsPerMinute = wordsPerMinute; self.bitrate = bitrate; self.mode = mode
         self.text = text.isUnchanged ? nil : text
+    }
+    /// Compares only the settings that affect this provider's narration and output.
+    public func isEquivalent(to other: NarrationPreset) -> Bool {
+        guard provider == other.provider, bitrate == other.bitrate, mode == other.mode, textOptions == other.textOptions else { return false }
+        if provider == .system { return voice == other.voice && wordsPerMinute == other.wordsPerMinute }
+        return model == other.model && apiVoice == other.apiVoice && speed == other.speed
+            && (provider != .openAI || instructions == other.instructions)
     }
     public func api(key: String) -> APINarration? {
         provider == .system ? nil : APINarration(provider: provider, model: model, voice: apiVoice, speed: speed, instructions: instructions, apiKey: key)

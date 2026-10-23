@@ -17,13 +17,16 @@ public struct AudiobookJob: Identifiable, Sendable, Codable {
     public var chapterIDs: Set<String>?
     /// Section IDs in a custom reading order; nil follows the EPUB spine.
     public var chapterOrder: [String]?
+    /// Custom section titles by section ID.
+    public var chapterTitles: [String: String]?
     public var narration: NarrationPreset?
 
-    public init(source: URL, chapterIDs: Set<String>? = nil, chapterOrder: [String]? = nil) {
+    public init(source: URL, chapterIDs: Set<String>? = nil, chapterOrder: [String]? = nil, chapterTitles: [String: String]? = nil) {
         self.source = source
         self.title = source.deletingPathExtension().lastPathComponent
         self.chapterIDs = chapterIDs
         self.chapterOrder = chapterOrder
+        self.chapterTitles = chapterTitles
     }
 }
 
@@ -110,14 +113,14 @@ public final class AudiobookQueue: ObservableObject {
     public var queuedCount: Int { jobs.filter { $0.state == .queued }.count }
     public func rememberSelection(_ id: UUID?) { selectedID = id; persist() }
 
-    @discardableResult public func add(_ urls: [URL], chapterIDs: Set<String>? = nil, chapterOrder: [String]? = nil) -> Int {
+    @discardableResult public func add(_ urls: [URL], chapterIDs: Set<String>? = nil, chapterOrder: [String]? = nil, chapterTitles: [String: String]? = nil) -> Int {
         guard !isRunning else { return 0 }
         var pending = Set(jobs.filter { [.queued, .running].contains($0.state) }.map { $0.source.resolvingSymlinksInPath().standardizedFileURL })
         var added = 0
         for url in urls where url.isFileURL && url.pathExtension.lowercased() == "epub" {
             let canonical = url.resolvingSymlinksInPath().standardizedFileURL
             if pending.insert(canonical).inserted {
-                jobs.append(AudiobookJob(source: url, chapterIDs: chapterIDs, chapterOrder: chapterOrder)); added += 1
+                jobs.append(AudiobookJob(source: url, chapterIDs: chapterIDs, chapterOrder: chapterOrder, chapterTitles: chapterTitles)); added += 1
             }
         }
         if added > 0 { summary = "\(queuedCount) " + (queuedCount == 1 ? "EPUB ready to convert." : "EPUBs ready to convert.") }
@@ -167,9 +170,17 @@ public final class AudiobookQueue: ObservableObject {
         jobs[index].message = "Waiting to retry."; jobs[index].output = nil
     }
 
-    public func updateSettings(_ id: UUID, chapterIDs: Set<String>, chapterOrder: [String]? = nil, narration: NarrationPreset?) {
+    public func updateSettings(_ id: UUID, chapterIDs: Set<String>, chapterOrder: [String]? = nil, chapterTitles: [String: String]? = nil,
+                               narration: NarrationPreset?) {
         guard !isRunning, let index = jobs.firstIndex(where: { $0.id == id }), jobs[index].state != .done else { return }
-        jobs[index].chapterIDs = chapterIDs; jobs[index].chapterOrder = chapterOrder; jobs[index].narration = narration
+        jobs[index].chapterIDs = chapterIDs; jobs[index].chapterOrder = chapterOrder
+        jobs[index].chapterTitles = chapterTitles; jobs[index].narration = narration
+    }
+
+    /// Returns a waiting job to the settings in effect when the queue starts; sections are kept.
+    public func clearNarration(_ id: UUID) {
+        guard !isRunning, let index = jobs.firstIndex(where: { $0.id == id }), jobs[index].state != .done else { return }
+        jobs[index].narration = nil
     }
 
     public func move(_ id: UUID, before target: UUID) {
@@ -230,6 +241,7 @@ public final class AudiobookQueue: ObservableObject {
                 let source = jobs[index].source
                 let selectedIDs = jobs[index].chapterIDs
                 let order = jobs[index].chapterOrder
+                let titles = jobs[index].chapterTitles
                 let processRunner = ProcessRunner()
                 runner = processRunner
                 do {
@@ -249,7 +261,7 @@ public final class AudiobookQueue: ObservableObject {
                     let destination = Self.uniqueDestination(title: book.title, folder: folder, mode: narration.mode)
                     jobs[index].output = destination
                     // The open-book view applies the order itself; only the export is rearranged.
-                    let result = try await exporter(book.reordered(order), options, destination, processRunner) { [weak self] update in
+                    let result = try await exporter(book.reordered(order).retitled(titles), options, destination, processRunner) { [weak self] update in
                         Task { @MainActor [weak self] in self?.receive(update, id: id) }
                     }
                     jobs[index].output = result; jobs[index].state = .done

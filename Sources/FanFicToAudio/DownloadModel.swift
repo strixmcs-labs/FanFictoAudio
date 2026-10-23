@@ -3,13 +3,19 @@ import SwiftUI
 import DownloadCore
 import UniformTypeIdentifiers
 
-struct StoryJob: Identifiable {
-    let id = UUID()
+enum StoryState: String, Codable {
+    case queued = "Queued", running = "Running", done = "Done", upToDate = "Up to date", failed = "Failed", cancelled = "Cancelled"
+    var isFinished: Bool { self != .queued && self != .running }
+    var canRetry: Bool { self == .failed || self == .cancelled }
+}
+
+struct StoryJob: Identifiable, Codable {
+    var id = UUID()
     var request: DownloadRequest
     var title: String
     var author = ""
     var wordCount = ""
-    var state = "Queued"
+    var state = StoryState.queued
     var message = ""
     var progress: Double?
     var path: URL?
@@ -28,7 +34,7 @@ final class DownloadModel: ObservableObject {
         didSet { UserDefaults.standard.set(ini, forKey: "personalINI") }
     }
     @Published var adult = false
-    @Published var jobs: [StoryJob] = []
+    @Published var jobs: [StoryJob] = [] { didSet { persist() } }
     @Published var selected: UUID?
     @Published var isRunning = false
     @Published var isFinalizing = false
@@ -40,9 +46,33 @@ final class DownloadModel: ObservableObject {
     private var runner: DownloadRunner?
     private var task: Task<Void, Never>?
     private var pauseRequested = false
+    private let storage: URL?
+    private struct Snapshot: Codable { let version: Int; let jobs: [StoryJob] }
+
+    /// Restores the story list from the last session. Interrupted downloads wait to be started again.
+    init(storage: URL? = AppData.directory.appendingPathComponent("downloads.json")) {
+        self.storage = storage
+        guard let storage, let data = try? Data(contentsOf: storage),
+              let saved = try? JSONDecoder().decode(Snapshot.self, from: data), saved.version == 1 else { return }
+        jobs = saved.jobs.map { job in
+            var restored = job
+            if restored.state == .running {
+                restored.state = .queued; restored.progress = nil
+                restored.message = "Interrupted when the app quit. Start the queue to download it again."
+            }
+            return restored
+        }
+        selected = jobs.last?.id
+    }
+
+    private func persist() {
+        guard let storage else { return }
+        try? FileManager.default.createDirectory(at: storage.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? JSONEncoder().encode(Snapshot(version: 1, jobs: jobs)).write(to: storage, options: .atomic)
+    }
 
     var selectedJob: StoryJob? { jobs.first { $0.id == selected } }
-    var hasQueued: Bool { jobs.contains { $0.state == "Queued" } }
+    var hasQueued: Bool { jobs.contains { $0.state == .queued } }
     var helper: URL? {
         let bundled = Bundle.main.resourceURL?.appendingPathComponent("Downloader/fanfic-download")
         if let bundled, FileManager.default.isExecutableFile(atPath: bundled.path) { return bundled }
@@ -99,9 +129,9 @@ final class DownloadModel: ObservableObject {
         isRunning = true; pauseRequested = false; readyURL = nil; readyURLs = []
         task = Task { [self] in
             var completedBooks: [URL] = []
-            while !pauseRequested, let index = jobs.firstIndex(where: { $0.state == "Queued" }) {
+            while !pauseRequested, let index = jobs.firstIndex(where: { $0.state == .queued }) {
                 let id = jobs[index].id
-                jobs[index].state = "Running"
+                jobs[index].state = .running
                 jobs[index].message = "Reading story information…"
                 selected = id; isFinalizing = false
                 let jobRunner = DownloadRunner()
@@ -111,7 +141,7 @@ final class DownloadModel: ObservableObject {
                         Task { @MainActor [weak self] in self?.receive(event, for: id) }
                     }
                     if let current = jobs.firstIndex(where: { $0.id == id }) {
-                        jobs[current].state = result.status == "unchanged" ? "Up to date" : "Done"
+                        jobs[current].state = result.status == "unchanged" ? .upToDate : .done
                         jobs[current].message = result.status == "unchanged" ? "No new chapters. Your EPUB is unchanged." : "Completed."
                         jobs[current].progress = 100
                         if let path = result.path {
@@ -127,11 +157,11 @@ final class DownloadModel: ObservableObject {
                     }
                 } catch is CancellationError {
                     if let current = jobs.firstIndex(where: { $0.id == id }) {
-                        jobs[current].state = "Cancelled"; jobs[current].message = "Download cancelled."
+                        jobs[current].state = .cancelled; jobs[current].message = "Download cancelled."
                     }
                 } catch {
                     if let current = jobs.firstIndex(where: { $0.id == id }) {
-                        jobs[current].state = "Failed"; jobs[current].message = error.localizedDescription
+                        jobs[current].state = .failed; jobs[current].message = error.localizedDescription
                     }
                 }
                 runner = nil; isFinalizing = false
@@ -143,7 +173,7 @@ final class DownloadModel: ObservableObject {
     }
 
     private func receive(_ event: DownloadEvent, for id: UUID) {
-        guard let index = jobs.firstIndex(where: { $0.id == id }), jobs[index].state == "Running" else { return }
+        guard let index = jobs.firstIndex(where: { $0.id == id }), jobs[index].state == .running else { return }
         if let metadata = event.metadata { apply(metadata, at: index) }
         if let message = event.message { jobs[index].message = message }
         if let percent = event.percent { jobs[index].progress = percent }
@@ -163,10 +193,10 @@ final class DownloadModel: ObservableObject {
     }
 
     func retrySelected() {
-        guard !isRunning, let index = jobs.firstIndex(where: { $0.id == selected }), ["Failed", "Cancelled"].contains(jobs[index].state) else { return }
+        guard !isRunning, let index = jobs.firstIndex(where: { $0.id == selected }), jobs[index].state.canRetry else { return }
         jobs[index].request.ini = ini; jobs[index].request.adult = adult
         jobs[index].request.source_kind = jobs[index].request.operation == "download" ? sourceKind : "story"
-        jobs[index].state = "Queued"; jobs[index].progress = nil; jobs[index].message = ""
+        jobs[index].state = .queued; jobs[index].progress = nil; jobs[index].message = ""
         start()
     }
 

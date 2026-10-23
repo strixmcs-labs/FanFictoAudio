@@ -40,7 +40,7 @@ Local narration invokes `/usr/bin/say`. OpenAI and ElevenLabs use separate reque
 
 The packaged encoder is built from pinned FFmpeg and LAME sources, statically links its codec libraries, and depends only on macOS system libraries. Sources and license notices accompany the binary. Network and GPL components are disabled.
 
-Each passage becomes decoded PCM audio, which is checked for usable speech data before FFmpeg encoding. A single MP3 joins all passages once; chapter mode writes numbered outputs. Files are staged and then published without overwriting existing destinations. Temporary work is cleaned after success, cancellation, or failure. Audiobook jobs and completed passages are saved for recovery; book previews and download jobs remain in memory for the current session.
+Each passage becomes decoded PCM audio, which is checked for usable speech data before FFmpeg encoding. A single MP3 joins all passages once; chapter mode writes numbered outputs. Files are staged and then published without overwriting existing destinations. Temporary work is cleaned after success, cancellation, or failure. Audiobook jobs and completed passages are saved for recovery; the download list is saved separately, and book previews remain in memory for the current session. AI speech requests run a few at a time (three for OpenAI, two for ElevenLabs) ahead of the passage being encoded; results are consumed and encoded in reading order.
 
 ## Boundaries
 

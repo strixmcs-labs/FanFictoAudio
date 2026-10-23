@@ -44,55 +44,117 @@ public enum AudiobookExporter {
         let partExtension = options.mode == .m4b ? "m4a" : "mp3"
         let totalCharacters = max(1, chapters.reduce(0) { $0 + $1.text.count })
         var completedCharacters = 0
+        let chunked = chapters.map { speechChunks($0.text, limit: options.api == nil ? 6000 : 1500, utf8Limit: options.api?.provider == .openAI ? 2000 : nil) }
+        func passageName(_ chapterIndex: Int, _ chunkIndex: Int) -> String { "part-\(chapterIndex)-\(chunkIndex).\(partExtension)" }
+        var cachedPassages: [String: CachedPassage] = [:]
+        if let checkpoint {
+            for (chapterIndex, chunks) in chunked.enumerated() {
+                for chunkIndex in chunks.indices {
+                    let name = passageName(chapterIndex, chunkIndex)
+                    if let saved = try checkpoint.cached(name) { cachedPassages[name] = saved }
+                }
+            }
+        }
+        // AI speech is network-bound: keep a few requests in flight ahead of the passage being
+        // encoded. Results are consumed in reading order; encoding stays sequential.
+        var speechRequests: [(name: String, text: String, destination: URL, isLast: Bool)] = []
+        if let api = options.api {
+            for (chapterIndex, chunks) in chunked.enumerated() {
+                for (chunkIndex, chunk) in chunks.enumerated() where cachedPassages[passageName(chapterIndex, chunkIndex)] == nil {
+                    speechRequests.append((passageName(chapterIndex, chunkIndex), chunk,
+                        work.appendingPathComponent("speech-\(chapterIndex)-\(chunkIndex).\(api.provider == .openAI ? "wav" : "mp3")"),
+                        chunkIndex == chunks.count - 1))
+                }
+            }
+        }
+        var inFlight: [String: Task<URL, Error>] = [:]
+        var nextRequest = 0
+        defer { for task in inFlight.values { task.cancel() } }
+        func dispatchSpeech() {
+            guard let api = options.api else { return }
+            let usage = options.usage, budget = options.budget
+            while inFlight.count < api.provider.concurrentRequests, nextRequest < speechRequests.count {
+                let request = speechRequests[nextRequest]; nextRequest += 1
+                inFlight[request.name] = Task {
+                    try await apiClient.synthesize(text: request.text, settings: api, destination: request.destination, usage: usage, budget: budget)
+                    return request.destination
+                }
+            }
+        }
+        /// Validates and encodes one passage, saving it to the checkpoint when there is one.
+        func encode(_ speech: URL, partName: String, isLast: Bool) async throws -> (url: URL, duration: Double) {
+            var pcm = speech
+            if options.api?.provider == .elevenLabs {
+                // Validate decoded PCM; Core Audio cannot seek in every MP3 variant.
+                let decoded = work.appendingPathComponent("decoded-\(partName).wav")
+                _ = try await runner.run(options.ffmpeg, arguments: ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", pcm.path, "-map", "0:a:0", "-c:a", "pcm_s16le", decoded.path])
+                try FileManager.default.removeItem(at: pcm)
+                pcm = decoded
+            }
+            try runner.checkCancellation()
+            try validateSpeech(pcm, voice: options.api?.provider.rawValue ?? options.voice)
+            let mp3 = work.appendingPathComponent(partName)
+            var arguments = ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", pcm.path,
+                             "-map", "0:a:0", "-vn", "-ac", "1", "-ar", sampleRate, "-c:a", options.mode == .m4b ? "aac" : "libmp3lame",
+                             "-b:a", "\(options.bitrate)k"]
+            if isLast { arguments += ["-af", "apad=pad_dur=0.7"] }
+            arguments += ["-map_metadata", "-1", mp3.path]
+            _ = try await runner.run(options.ffmpeg, arguments: arguments)
+            try FileManager.default.removeItem(at: pcm)
+            let duration = try await audioDuration(mp3)
+            guard let checkpoint else { return (mp3, duration) }
+            try checkpoint.commit(partName, from: mp3, duration: duration)
+            try FileManager.default.removeItem(at: mp3)
+            return (checkpoint.directory.appendingPathComponent(partName), duration)
+        }
+        /// After a failed request, keep passages that other in-flight requests already returned
+        /// (and were billed for), so a retry does not request them again.
+        func saveCompletedSpeech() async {
+            guard checkpoint != nil else { return }
+            for request in speechRequests[..<nextRequest] {
+                guard let task = inFlight.removeValue(forKey: request.name), let speech = try? await task.value else { continue }
+                _ = try? await encode(speech, partName: request.name, isLast: request.isLast)
+            }
+        }
         for (chapterIndex, chapter) in chapters.enumerated() {
             try runner.checkCancellation()
-            let chunks = speechChunks(chapter.text, limit: options.api == nil ? 6000 : 1500, utf8Limit: options.api?.provider == .openAI ? 2000 : nil)
+            let chunks = chunked[chapterIndex]
             var parts: [URL] = []
             var chapterDuration = 0.0
             for (chunkIndex, chunk) in chunks.enumerated() {
                 try runner.checkCancellation()
                 let fraction = Double(completedCharacters) / Double(totalCharacters) * 0.94
                 progress(ExportProgress(fraction, "Narrating \(chapterIndex + 1) of \(chapters.count): \(chapter.title) · passage \(chunkIndex + 1) of \(chunks.count)"))
-                let partName = "part-\(chapterIndex)-\(chunkIndex).\(partExtension)"
-                if let cached = try checkpoint?.cached(partName), let checkpoint {
+                let partName = passageName(chapterIndex, chunkIndex)
+                if let cached = cachedPassages[partName], let checkpoint {
                     parts.append(checkpoint.directory.appendingPathComponent(partName))
                     chapterDuration += cached.duration; completedCharacters += chunk.count
                     progress(ExportProgress(Double(completedCharacters) / Double(totalCharacters) * 0.94, "Reusing completed passage \(chunkIndex + 1): \(chapter.title)"))
                     continue
                 }
-                let text = work.appendingPathComponent("passage.txt")
-                var pcm = work.appendingPathComponent(options.api == nil ? "passage.aiff" : (options.api?.provider == .openAI ? "passage.wav" : "passage.mp3"))
-                let mp3 = work.appendingPathComponent(partName)
-                if let api = options.api {
-                    try await apiClient.synthesize(text: chunk, settings: api, destination: pcm, usage: options.usage, budget: options.budget)
-                    if api.provider == .elevenLabs {
-                        // Validate decoded PCM; Core Audio cannot seek in every MP3 variant.
-                        let decoded = work.appendingPathComponent("passage.wav")
-                        _ = try await runner.run(options.ffmpeg, arguments: ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", pcm.path, "-map", "0:a:0", "-c:a", "pcm_s16le", decoded.path])
-                        try FileManager.default.removeItem(at: pcm)
-                        pcm = decoded
+                let speech: URL
+                if options.api != nil {
+                    dispatchSpeech()
+                    guard let request = inFlight.removeValue(forKey: partName) else {
+                        throw AudiobookError.conversion("A narration request was not scheduled.")
                     }
+                    do {
+                        speech = try await withTaskCancellationHandler { try await request.value } onCancel: { request.cancel() }
+                    } catch {
+                        if !(error is CancellationError), !Task.isCancelled { await saveCompletedSpeech() }
+                        throw error
+                    }
+                    dispatchSpeech()
                 } else {
+                    let text = work.appendingPathComponent("passage.txt")
+                    speech = work.appendingPathComponent("passage.aiff")
                     try chunk.write(to: text, atomically: true, encoding: .utf8)
                     _ = try await runner.run(SpeechTools.say, arguments: ["-v", options.voice, "-r", String(options.wordsPerMinute),
-                        "-f", text.path, "-o", pcm.path, "--data-format=BEI16@44100"])
+                        "-f", text.path, "-o", speech.path, "--data-format=BEI16@44100"])
                 }
-                try runner.checkCancellation()
-                try validateSpeech(pcm, voice: options.api?.provider.rawValue ?? options.voice)
-                var arguments = ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", pcm.path,
-                                 "-map", "0:a:0", "-vn", "-ac", "1", "-ar", sampleRate, "-c:a", options.mode == .m4b ? "aac" : "libmp3lame",
-                                 "-b:a", "\(options.bitrate)k"]
-                if chunkIndex == chunks.count - 1 { arguments += ["-af", "apad=pad_dur=0.7"] }
-                arguments += ["-map_metadata", "-1", mp3.path]
-                _ = try await runner.run(options.ffmpeg, arguments: arguments)
-                try FileManager.default.removeItem(at: pcm)
-                let duration = try await audioDuration(mp3)
-                chapterDuration += duration
-                if let checkpoint {
-                    try checkpoint.commit(partName, from: mp3, duration: duration)
-                    try FileManager.default.removeItem(at: mp3)
-                    parts.append(checkpoint.directory.appendingPathComponent(partName))
-                } else { parts.append(mp3) }
+                let encoded = try await encode(speech, partName: partName, isLast: chunkIndex == chunks.count - 1)
+                parts.append(encoded.url)
+                chapterDuration += encoded.duration
                 completedCharacters += chunk.count
             }
             chapterDurations.append(chapterDuration)

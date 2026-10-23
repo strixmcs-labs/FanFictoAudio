@@ -66,6 +66,40 @@ struct NarrationTextTests {
         #expect(prepare(paragraphs("A/N: Hi!", "The water was cold."), both, title: "The Lake") == paragraphs("The Lake.", "The water was cold."))
     }
 
+    @Test func pronunciationsReplaceWholeWordsLongestFirst() {
+        let options = NarrationTextOptions(pronunciations: [
+            Pronunciation(word: "Hermione", sayAs: "Her-my-oh-nee"), Pronunciation(word: "Hermione Granger", sayAs: "Her-my-oh-nee Grain-jer"),
+            Pronunciation(word: "Sirius", sayAs: ""), Pronunciation(word: "$5", sayAs: "five dollars")])
+        #expect(options.pronunciations.count == 3)
+        #expect(prepare("HERMIONE GRANGER smiled. Hermione's wand. Hermionely.", options) == "Her-my-oh-nee Grain-jer smiled. Her-my-oh-nee's wand. Hermionely.")
+        // Incomplete rows are ignored instead of deleting the word; patterns and templates are literal.
+        #expect(prepare("Sirius paid $5.", options) == "Sirius paid five dollars.")
+        let withTitle = NarrationTextOptions(announceChapterTitles: true, pronunciations: [Pronunciation(word: "Hermione", sayAs: "Her-my-oh-nee")])
+        #expect(prepare("Text.", withTitle, title: "Hermione") == paragraphs("Her-my-oh-nee.", "Text."))
+    }
+
+    @Test func savedTextOptionsDecodeMissingFieldsAsDefaults() throws {
+        let older = try JSONDecoder().decode(NarrationTextOptions.self, from: Data(#"{"skipAuthorNotes":true,"announceChapterTitles":false}"#.utf8))
+        #expect(older == NarrationTextOptions(skipAuthorNotes: true))
+        let preset = NarrationPreset(voice: "Ava", wordsPerMinute: 175, bitrate: 128, mode: .single, api: nil, text: older)
+        #expect(preset.isEquivalent(to: NarrationPreset(voice: "Ava", wordsPerMinute: 175, bitrate: 128, mode: .single, api: nil, text: older)))
+        #expect(!preset.isEquivalent(to: NarrationPreset(voice: "Ava", wordsPerMinute: 175, bitrate: 128, mode: .single, api: nil)))
+        // Settings unused by a provider don't count as differences.
+        let api = APINarration(provider: .elevenLabs, model: "m", voice: "v", apiKey: "")
+        #expect(NarrationPreset(voice: "Ava", wordsPerMinute: 175, bitrate: 128, mode: .m4b, api: api)
+            .isEquivalent(to: NarrationPreset(voice: "Zoe", wordsPerMinute: 300, bitrate: 128, mode: .m4b, api: api)))
+    }
+
+    @Test func customTitlesApplyByIDWithoutChangingText() {
+        let book = EPUBBook(title: "T", author: "A", language: "en", chapters: [
+            BookChapter(id: "1", title: "Ch 1 (UPDATED)", text: "The water was cold."), BookChapter(id: "2", title: "Two", text: "Words.")
+        ], source: URL(fileURLWithPath: "/tmp/book.epub"))
+        let renamed = book.retitled(["1": "  The   Lake ", "2": "   ", "missing": "X"])
+        #expect(renamed.chapters.map(\.title) == ["The Lake", "Two"])
+        #expect(renamed.chapters[0].wordCount == 4 && renamed.chapters[0].text == "The water was cold.")
+        #expect(book.retitled(nil).chapters.map(\.title) == ["Ch 1 (UPDATED)", "Two"])
+    }
+
     @Test func presetsSavedBeforeTextOptionsStillDecodeAndUnchangedTextIsOmitted() throws {
         let unchanged = NarrationPreset(voice: "Ava", wordsPerMinute: 175, bitrate: 128, mode: .single, api: nil)
         let encoded = try JSONEncoder().encode(unchanged)

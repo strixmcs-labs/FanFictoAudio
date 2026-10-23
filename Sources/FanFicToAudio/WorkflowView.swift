@@ -23,7 +23,7 @@ struct WorkflowView: View {
                 ContentView(model: audio)
             }
         }
-        .background(Color.white).tint(AppTheme.oxblood)
+        .background(AppTheme.background).tint(AppTheme.oxblood)
         .onChange(of: download.isRunning) { _, value in
             audio.downloadInProgress = value
             if value { audio.stopPreview() }

@@ -7,7 +7,7 @@
 1. Paste one story page or direct EPUB URL per line in **Download by Link**. Keep **Detect automatically**, or choose **Story page** / **Direct EPUB** explicitly for unusual links.
 2. Choose where to save your EPUBs. If the site needs login credentials or cookies, select your `personal.ini`. Adult access is an explicit session choice.
 3. Click **Download & Prepare Audiobook**. Every successful EPUB is added to the saved audiobook queue in download order. The last one opens for review when the batch finishes. To narrate another downloaded story, select its queue row and click **Make Audiobook**.
-4. Review the chapters and text preview. Choose macOS, OpenAI, or ElevenLabs narration, a voice, speed, audio output mode, and bitrate. Enter an exact macOS narration rate or use the slider (**80–1,000 WPM**). Actual delivery depends on the selected voice. **Preview** reads a short sample.
+4. Review the chapters and text preview on **Open Book**. In **Voice & Text**, choose macOS, OpenAI, or ElevenLabs narration, a voice, speed, audio output mode, and bitrate. Enter an exact macOS narration rate or use the slider (**80–1,000 WPM**). Actual delivery depends on the selected voice. **Preview** reads a short sample.
 5. Click **Create Audiobook…** and choose a new destination. Export one MP3, a folder of numbered chapter MP3s, or an M4B with chapter markers and embedded EPUB cover art when available.
 
 You can also open an existing EPUB directly into the audiobook view. Dropped EPUBs are added to the audiobook queue. **Open EPUB…** in the toolbar and Command-O work from either step.
@@ -25,17 +25,27 @@ Each book creates a separate MP3, M4B, or chapter folder named from its title. D
 
 **Cancel & Pause Queue** cancels the current book and leaves the remaining EPUBs queued. **Start Queue** resumes them. Use **Retry Selected** to requeue a failed or cancelled book, then start again. **Remove Selected** removes a row and its resume checkpoints, without deleting source or output files. **Clear Completed** clears successful rows only.
 
-EPUBs added from disk use their default reading-order sections. To customize a queued book, select its row, check the sections you want, choose narration/output settings, then click **Save Current Settings & Sections for Selected Book**. This also replaces a previous preset. **Add Open Book** keeps your current section selection for a new entry. The single-book export remains available below the queue.
+EPUBs added from disk use their default reading-order sections. To customize a queued book, select its row, check the sections you want, choose narration/output settings, then click **Save Current Settings & Sections for Selected Book**. This also replaces a previous preset. **Add Open Book** keeps your current section selection for a new entry. The single-book export is on the **Open Book** pane.
+
+When a queued book has saved settings, its row shows them and the selected book shows **Saved for this book**. If they differ from the **Voice & Text** controls, a note says the book will use its saved settings. **Use in Controls** copies them into the controls (which also become the defaults for new books); **Clear Saved Settings** makes the book use the controls in effect when the queue starts.
 
 The audiobook queue, order, selected row, per-book presets, and output folder survive app restarts. An interrupted running entry becomes queued; failed/cancelled entries retain their state until you click **Retry Selected**. Keys remain in Keychain and are resolved again before each batch. A missing or moved EPUB is reported as a failed job.
 
-Completed passages are saved under `~/Library/Application Support/FanFicToAudio/Checkpoints`. Both individual and queued exports can reuse them. Reuse requires matching text, section choices, voice, provider/model/style/speed, bitrate, and output format; cached bytes are checksum-verified. The currently unfinished passage may be sent and charged again. Completed exports remove their matching checkpoint. Older checkpoints with different settings remain until the job is removed or **Discard Saved Passages** is selected; single-book leftovers can be removed from that folder while the app is idle. **Clear Folder** resets only the output folder choice.
+Completed passages are saved under `~/Library/Application Support/FanFicToAudio/Checkpoints`. Both individual and queued exports can reuse them. Reuse requires matching text, section choices, voice, provider/model/style/speed, bitrate, and output format; cached bytes are checksum-verified. Passages in progress when you cancel (up to three with OpenAI, two with ElevenLabs) may be sent and charged again; if a request fails, passages that other requests already returned are saved first. Completed exports remove their matching checkpoint. Older checkpoints with different settings remain until the job is removed or **Discard Saved Passages** is selected; single-book leftovers can be removed from that folder while the app is idle. **Clear Folder** resets only the output folder choice.
 
 ## Reading order and narrated text
 
-Drag sections in the **Reading order** sidebar to change their order, or right-click a section to move it to the top, up, down, or bottom. **Restore** (or **Restore EPUB Order** in the checklist menu) returns to the book's spine order. Exports, M4B chapter markers, chapter file numbering, and saved queue settings follow the custom order.
+Drag sections in the **Reading order** sidebar to change their order, or right-click a section to move it to the top, up, down, or bottom, or to **Rename…** it. A renamed title is used for M4B chapter markers, chapter file names, and read-aloud titles; **Use Original Title** restores the book's title. **Restore** (or **Restore EPUB Order** in the checklist menu) returns to the book's spine order. Exports, M4B chapter markers, chapter file numbering, and saved queue settings follow the custom order.
 
 Under **Narration**, **Skip author's notes** leaves out paragraphs that begin like "A/N:", "Author's Note", "T/N:", "Disclaimer", or "Notes:", and inline "(A/N: …)" asides. A note at the start of a section is removed through the first scene break (such as `***` or `oOo`) when one follows closely; a short note at the end of a section is removed with everything after it. A section containing only notes is skipped. **Read chapter titles aloud** adds the section title before sections whose text does not already begin with it; FanFicFare EPUBs normally include the heading already. The text preview and voice preview show the result. Both choices are saved with **Save Current Settings & Sections for Selected Book** and apply to queue entries without a saved preset.
+
+### Pronunciations
+
+Under **Voice & Text → Pronunciations**, click **Add Word** and enter a word as it appears in the book and a spelling that sounds right (for example, *Hermione* → *Her-my-oh-nee*). Whole words are replaced in every book, ignoring capitalization, for all voices; longer entries apply first. Incomplete rows are ignored. The list is saved with a book's settings when you click **Save Current Settings & Sections for Selected Book**.
+
+### Notifications
+
+When an export or the audiobook queue finishes while you're working in another app, a macOS notification reports the result. Allow notifications when asked, or change this later in **System Settings → Notifications → FanFic to Audio**.
 
 ## Combine books into a series
 
@@ -47,7 +57,7 @@ The merger preserves original chapter files, images, styles, and relative resour
 
 Choose **OpenAI** or **ElevenLabs** under **Speech provider**. Enter your own provider API key in the secure field and click **Save Key**. Keys are stored in macOS Keychain; they are never saved in app preferences. **Remove Key** deletes that provider's saved key.
 
-OpenAI offers built-in voices and an editable model ID, plus optional style instructions for models that support them. ElevenLabs accepts a voice ID from your library, or **Load Voices** retrieves your account's available voices. Both providers have a separate API speed multiplier. These choices apply to previews, individual exports, and the queue.
+OpenAI offers built-in voices and an editable model ID, plus optional style instructions for models that support them. ElevenLabs accepts a voice ID from your library, or **Load Voices** retrieves your account's available voices. Both providers have a separate API speed multiplier. These choices, including speed and style, are remembered between launches and apply to previews, individual exports, and the queue. During export, up to three OpenAI or two ElevenLabs requests are sent at once to shorten conversion; if a provider rate-limits a request, the export stops without retrying, and **Retry Selected** or a new export resumes from completed passages.
 
 Preview and conversion send the selected book text to the chosen provider and may incur its API charges. The interface and exported audio metadata identify AI-generated narration. Passages are bounded and sent sequentially. OpenAI passages also have a conservative UTF-8 byte limit to keep multilingual input below the documented token ceiling. Cancellation stops the active request; errors are shown without echoing provider response bodies. The app does not automatically retry paid speech requests. Retry an unsuccessful job explicitly when ready. Retry reuses compatible completed passages and sends only unfinished passages.
 
@@ -77,7 +87,7 @@ The companion CLI includes `benchmark-read BOOK.epub` for comparing 20 fresh rea
 - **Update Existing EPUBs…** updates FanFicFare books and backs up originals to **FanFicFare Backups** beside each book. Books with no new chapters stay unchanged.
 - **Cancel & Pause Queue** stops the active download and cleans partial work. **Start Queue** resumes remaining jobs. **Retry Selected** retries a failed or cancelled job using the current INI and adult-access choices.
 - Successful downloads never overwrite existing filenames. The app acknowledges a complete, validated EPUB before the helper publishes it. Cancellation is disabled briefly while the book is saved.
-- The download queue lasts for the current app session. The audiobook queue is saved automatically. Destination, INI path, voice, speed, and bitrate are remembered in this app's own settings. INI contents and adult-access confirmation are not saved by the interface.
+- The download list is restored when the app relaunches; an interrupted download returns to **Queued** and must be started again. The audiobook queue is saved automatically. Destination, INI path, voice, speed, and bitrate are remembered in this app's own settings. INI contents and adult-access confirmation are not saved by the interface.
 
 [FanFicFare](https://github.com/JimmXinu/FanFicFare), by Jim Miller (JimmXinu) and its contributors, powers story downloads, EPUB writing and updates, metadata previews, link extraction, site adapters, and authentication behavior. Its [documentation](https://github.com/JimmXinu/FanFicFare/wiki) covers site support and INI configuration. Site restrictions and browser challenges can require a configured INI; interactive password or two-factor prompts are not supported. The app reads only packaged defaults and your explicitly selected INI, and does not run FanFicFare CLI shell hooks.
 

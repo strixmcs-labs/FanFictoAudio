@@ -12,7 +12,7 @@ public enum AudiobookError: LocalizedError, Sendable {
 
 public struct BookChapter: Identifiable, Sendable {
     public let id: String
-    public let title: String
+    public private(set) var title: String
     public let text: String
     public let includedByDefault: Bool
     public let wordCount: Int
@@ -22,6 +22,10 @@ public struct BookChapter: Identifiable, Sendable {
         self.id = id; self.title = title; self.text = text; self.includedByDefault = includedByDefault
         self.wordCount = text.split(whereSeparator: { $0.isWhitespace }).count
         self.characterCount = text.unicodeScalars.count; self.utf8Count = text.utf8.count
+    }
+    /// The same section under another title, reusing its cached text counts.
+    public func titled(_ newTitle: String) -> BookChapter {
+        var copy = self; copy.title = newTitle; return copy
     }
 }
 
@@ -48,6 +52,18 @@ public struct EPUBBook: Sendable {
         arranged += chapters.filter { !seen.contains($0.id) }
         guard arranged.map(\.id) != chapters.map(\.id) else { return self }
         return EPUBBook(title: title, author: author, language: language, chapters: arranged, source: source, warnings: warnings, cover: cover)
+    }
+    /// Applies custom section titles by ID; blank or unknown entries are ignored.
+    public func retitled(_ titles: [String: String]?) -> EPUBBook {
+        guard let titles, !titles.isEmpty else { return self }
+        var changed = false
+        let renamed = chapters.map { chapter -> BookChapter in
+            guard let title = titles[chapter.id].map(EPUBReader.normalized), !title.isEmpty, title != chapter.title else { return chapter }
+            changed = true
+            return chapter.titled(title)
+        }
+        guard changed else { return self }
+        return EPUBBook(title: title, author: author, language: language, chapters: renamed, source: source, warnings: warnings, cover: cover)
     }
 }
 

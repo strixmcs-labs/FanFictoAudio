@@ -1,11 +1,36 @@
 import Foundation
 
+/// A word the narrator should say differently, such as a character name spelled phonetically.
+public struct Pronunciation: Codable, Sendable, Equatable, Identifiable {
+    /// Identifies an editor row only; it is not saved or compared.
+    public var id = UUID()
+    public var word: String
+    public var sayAs: String
+    enum CodingKeys: String, CodingKey { case word, sayAs }
+    public init(word: String = "", sayAs: String = "") { self.word = word; self.sayAs = sayAs }
+    public static func == (lhs: Pronunciation, rhs: Pronunciation) -> Bool { lhs.word == rhs.word && lhs.sayAs == rhs.sayAs }
+    /// Incomplete rows are ignored rather than deleting the word from the narration.
+    public var isActive: Bool {
+        let word = word.trimmingCharacters(in: .whitespaces), sayAs = sayAs.trimmingCharacters(in: .whitespaces)
+        return !word.isEmpty && !sayAs.isEmpty && word != sayAs
+    }
+}
+
 /// Optional cleanup of section text before narration. The defaults read the book as written.
 public struct NarrationTextOptions: Codable, Sendable, Equatable {
     public var skipAuthorNotes: Bool
     public var announceChapterTitles: Bool
-    public init(skipAuthorNotes: Bool = false, announceChapterTitles: Bool = false) {
+    public var pronunciations: [Pronunciation]
+    public init(skipAuthorNotes: Bool = false, announceChapterTitles: Bool = false, pronunciations: [Pronunciation] = []) {
         self.skipAuthorNotes = skipAuthorNotes; self.announceChapterTitles = announceChapterTitles
+        self.pronunciations = pronunciations.filter(\.isActive)
+    }
+    // Options saved before a field existed decode with that field's default.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(skipAuthorNotes: try container.decodeIfPresent(Bool.self, forKey: .skipAuthorNotes) ?? false,
+                  announceChapterTitles: try container.decodeIfPresent(Bool.self, forKey: .announceChapterTitles) ?? false,
+                  pronunciations: try container.decodeIfPresent([Pronunciation].self, forKey: .pronunciations) ?? [])
     }
     public static let unchanged = NarrationTextOptions()
     public var isUnchanged: Bool { self == .unchanged }
@@ -16,7 +41,19 @@ public enum NarrationText {
         var text = chapter.text
         if options.skipAuthorNotes { text = removingAuthorNotes(text) }
         if options.announceChapterTitles, !text.isEmpty { text = announcing(chapter.title, in: text) }
+        if !options.pronunciations.isEmpty { text = applying(options.pronunciations, to: text) }
         return text
+    }
+
+    /// Replaces whole words, ignoring case. Longer entries apply first so a full name
+    /// wins over a shorter entry it contains.
+    static func applying(_ pronunciations: [Pronunciation], to text: String) -> String {
+        pronunciations.filter(\.isActive).sorted { $0.word.count > $1.word.count }.reduce(text) { result, entry in
+            let word = NSRegularExpression.escapedPattern(for: entry.word.trimmingCharacters(in: .whitespaces))
+            return result.replacingOccurrences(of: #"(?<![\p{L}\p{N}])"# + word + #"(?![\p{L}\p{N}])"#,
+                with: NSRegularExpression.escapedTemplate(for: entry.sayAs.trimmingCharacters(in: .whitespaces)),
+                options: [.regularExpression, .caseInsensitive])
+        }
     }
 
     // A note can span several paragraphs. Only blocks this close to the start or end of a

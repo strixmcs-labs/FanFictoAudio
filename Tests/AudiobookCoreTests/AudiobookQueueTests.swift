@@ -178,7 +178,7 @@ struct AudiobookQueueTests {
         let sources = try fixtures(root, names: ["one.epub", "two.epub"])
         let storage = root.appendingPathComponent("queue.json")
         let queue = AudiobookQueue(storage: storage)
-        queue.add([sources[0]], chapterIDs: ["one", "extra"], chapterOrder: ["extra", "one"])
+        queue.add([sources[0]], chapterIDs: ["one", "extra"], chapterOrder: ["extra", "one"], chapterTitles: ["extra": "Bonus"])
         queue.add([sources[1]])
         queue.updateSettings(queue.jobs[1].id, chapterIDs: ["one"], chapterOrder: ["extra", "one"], narration: nil)
         queue.updateSettings(queue.jobs[1].id, chapterIDs: ["one"], chapterOrder: nil, narration: nil)
@@ -190,6 +190,8 @@ struct AudiobookQueueTests {
         try restored.start(settings: settings(), folder: root)
         await restored.waitUntilFinished()
         #expect(await recorder.chapterOrders == [["extra", "one"], ["one", "extra"]])
+        #expect(restored.jobs[0].chapterTitles == ["extra": "Bonus"])
+        #expect(await recorder.chapterTitles.first == ["Bonus", "One"])
         // The open book stays in spine order so the sidebar can restore it.
         #expect(restored.activeBook?.book.chapters.map(\.id) == ["one", "extra"])
     }
@@ -208,6 +210,10 @@ struct AudiobookQueueTests {
         await queue.waitUntilFinished()
         #expect(await recorder.calls.map(\.text) == [text])
         #expect(queue.jobs[0].narration?.textOptions == text)
+        queue.retry(queue.jobs[0].id)
+        #expect(queue.jobs[0].state == .done)
+        queue.clearNarration(queue.jobs[0].id)
+        #expect(queue.jobs[0].narration != nil)
     }
 
     private func settings(voice: String = "Test Voice", mode: ExportMode = .single) -> BatchNarrationSettings {
@@ -238,13 +244,14 @@ private actor QueueRecorder {
     var calls: [ExportOptions] = []
     var sources: [URL] = []
     var chapterOrders: [[String]] = []
+    var chapterTitles: [[String]] = []
     var active = 0
     var maximumActive = 0
     private var delayFirst: Bool
     init(delayFirst: Bool = false) { self.delayFirst = delayFirst }
     func export(_ book: EPUBBook, _ options: ExportOptions, _ destination: URL,
                 _ runner: ProcessRunner, _ progress: @Sendable (ExportProgress) -> Void) async throws -> URL {
-        sources.append(book.source); chapterOrders.append(book.chapters.map(\.id))
+        sources.append(book.source); chapterOrders.append(book.chapters.map(\.id)); chapterTitles.append(book.chapters.map(\.title))
         calls.append(options); active += 1; maximumActive = max(maximumActive, active)
         defer { active -= 1 }
         progress(ExportProgress(0.2, "Working…"))

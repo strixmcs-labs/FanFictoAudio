@@ -55,7 +55,7 @@ struct NarrationSettingsView: View {
             }.toggleStyle(.checkbox)
             Text("Skipping removes paragraphs that start like “A/N:”, “Author’s Note”, “Disclaimer”, or “Notes:”, including a whole note block before the first scene break or at the end of a section. Titles are added only to sections that don’t already open with one. Check the text preview for the result.")
                 .font(.caption).foregroundStyle(.secondary)
-        }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+        }.padding(20).background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
             .disabled(model.busy)
             .onChange(of: model.voice) { _, _ in model.stopPreview() }
             .onChange(of: model.rate) { _, _ in model.stopPreview() }

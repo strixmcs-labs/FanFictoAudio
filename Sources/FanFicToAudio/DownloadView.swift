@@ -46,7 +46,7 @@ struct DownloadView: View {
                                 .disabled(model.isRunning || model.links.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                     }.padding(20).frame(maxWidth: .infinity)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Download preferences").font(.headline)
                         Text("Save EPUBs to").font(.caption).foregroundStyle(.secondary)
@@ -64,7 +64,7 @@ struct DownloadView: View {
                         Text("Login details come from your selected INI. This choice applies to new and retried jobs.")
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(20).frame(width: 270, alignment: .leading)
-                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                        .background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
                 }
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
@@ -88,21 +88,21 @@ struct DownloadView: View {
                         ForEach(model.jobs) { job in
                             Button { model.selected = job.id } label: {
                                 HStack(alignment: .top, spacing: 14) {
-                                    Image(systemName: job.path != nil ? "book.closed.fill" : job.state == "Failed" ? "exclamationmark.circle" : "link")
+                                    Image(systemName: job.path != nil ? "book.closed.fill" : job.state == .failed ? "exclamationmark.circle" : "link")
                                         .font(.title2).foregroundStyle(accent).frame(width: 32).padding(.top, 4)
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(job.title).font(.headline).lineLimit(2).textSelection(.enabled)
                                         if !job.author.isEmpty { Text(job.author).font(.callout).foregroundStyle(.secondary) }
                                         if !job.wordCount.isEmpty { Text(job.wordCount).font(.caption).foregroundStyle(.secondary) }
                                         Text(job.message.isEmpty ? job.request.operation.capitalized : job.message)
-                                            .font(.caption).foregroundStyle(job.state == "Failed" ? .red : .secondary).lineLimit(4)
-                                        if job.state == "Running" {
+                                            .font(.caption).foregroundStyle(job.state == .failed ? .red : .secondary).lineLimit(4)
+                                        if job.state == .running {
                                             if let progress = job.progress { ProgressView(value: progress, total: 100) }
                                             else { ProgressView().controlSize(.small) }
                                         }
                                     }
                                     Spacer()
-                                    Text(job.state).font(.caption.weight(.medium)).padding(.horizontal, 10).padding(.vertical, 5)
+                                    Text(job.state.rawValue).font(.caption.weight(.medium)).padding(.horizontal, 10).padding(.vertical, 5)
                                         .background(accent.opacity(0.1), in: Capsule())
                                 }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
                                     .background(model.selected == job.id ? accent.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
@@ -115,11 +115,11 @@ struct DownloadView: View {
                                     Button("Make Audiobook") { openBook(path) }.buttonStyle(.borderedProminent).disabled(model.isRunning)
                                     Button("Show EPUB in Finder", action: model.revealSelected)
                                 }
-                                if ["Failed", "Cancelled"].contains(selected.state) {
+                                if selected.state.canRetry {
                                     Button("Retry Selected", action: model.retrySelected).disabled(model.isRunning)
                                 }
                                 Spacer()
-                                Button("Clear Finished") { model.jobs.removeAll { ["Done", "Up to date", "Failed", "Cancelled"].contains($0.state) } }
+                                Button("Clear Finished") { model.jobs.removeAll { $0.state.isFinished } }
                                     .disabled(model.isRunning)
                             }
                             if let backup = selected.backup {
@@ -127,7 +127,7 @@ struct DownloadView: View {
                             }
                         }
                     }
-                }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+                }.padding(20).background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
                 Text("FanFicFare handles supported story sites and their access requirements. Direct EPUB links are downloaded and validated before saving. EPUBs stay in your chosen folder. Choose macOS voices or an AI speech provider in the audiobook section.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(32).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
