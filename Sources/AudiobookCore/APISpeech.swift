@@ -4,6 +4,11 @@ public enum NarrationProvider: String, CaseIterable, Identifiable, Sendable, Cod
     case system = "macOS voices", openAI = "OpenAI", elevenLabs = "ElevenLabs"
     public var id: String { rawValue }
     public var speedRange: ClosedRange<Double> { self == .elevenLabs ? 0.7...1.2 : 0.25...4 }
+    /// Simultaneous speech requests during export. Low enough for entry-level rate and
+    /// concurrency limits; failed requests are not retried, so they are never billed twice.
+    public var concurrentRequests: Int {
+        switch self { case .system: 1; case .openAI: 3; case .elevenLabs: 2 }
+    }
 }
 
 public struct APINarration: Sendable {

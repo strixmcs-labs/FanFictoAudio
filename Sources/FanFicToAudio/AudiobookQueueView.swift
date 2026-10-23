@@ -59,7 +59,7 @@ struct AudiobookQueueView: View {
                                         Text(job.title).font(.callout.weight(.medium)).lineLimit(2)
                                         if !job.author.isEmpty { Text(job.author).font(.caption).foregroundStyle(.secondary) }
                                         if let preset = job.narration {
-                                            Text("\(preset.provider.rawValue) · \(preset.provider == .system ? preset.voice : preset.apiVoice) · \(preset.mode.rawValue)")
+                                            Text(preset.displaySummary)
                                                 .font(.caption2).foregroundStyle(.secondary)
                                         }
                                         Text(job.message).font(.caption).foregroundStyle(job.state == .failed ? .red : .secondary).lineLimit(3)
@@ -105,9 +105,10 @@ struct AudiobookQueueView: View {
                         Button("Clear Completed", action: model.clearCompletedAudiobooks).disabled(model.busy)
                     }
                     if job.state != .done {
+                        savedSettings(job)
                         HStack {
                             Button("Save Current Settings & Sections for Selected Book", action: model.saveSelectedJobSettings)
-                                .disabled(model.busy || model.book?.source != job.source || model.selectedChapters.isEmpty)
+                                .disabled(model.busy || !model.isOpen(job) || model.selectedChapters.isEmpty)
                             Button("Discard Saved Passages") { queue.discardCheckpoint(job.id) }.disabled(model.busy)
                         }
                     }
@@ -151,6 +152,28 @@ struct AudiobookQueueView: View {
             }
             Text("Select a row to open its EPUB, or drag rows into reading order. During conversion, the open book follows the active job. Retry resumes completed passages when the content and settings match. Removing a book discards its saved passages.")
                 .font(.caption2).foregroundStyle(.secondary)
-        }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+        }.padding(20).background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// A book with saved settings ignores the Voice & Text controls; say so plainly.
+    @ViewBuilder private func savedSettings(_ job: AudiobookJob) -> some View {
+        if let preset = job.narration {
+            let matches = preset.isEquivalent(to: model.presetFromControls())
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Label("Saved for this book: \(preset.displaySummary)", systemImage: "slider.horizontal.3").font(.caption)
+                    Spacer()
+                    Button("Use in Controls") { model.useInControls(preset) }.disabled(model.busy || matches)
+                    Button("Clear Saved Settings") { queue.clearNarration(job.id) }.disabled(model.busy)
+                }
+                if !matches {
+                    Text("This book will be narrated with its saved settings, not the current Voice & Text settings.")
+                        .font(.caption2).foregroundStyle(accent)
+                }
+            }
+            .padding(10).background(accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+        } else {
+            Text("This book will use the Voice & Text settings in effect when the queue starts.").font(.caption2).foregroundStyle(.secondary)
+        }
     }
 }

@@ -11,7 +11,7 @@ struct EPUBAudioCLI {
                 return
             }
             guard args.count >= 2 else {
-                print("Usage: epub-audio inspect BOOK.epub\n       epub-audio export BOOK.epub OUTPUT [--voice NAME] [--rate 175] [--bitrate 128] [--chapters | --m4b] [--ffmpeg PATH]\n       epub-audio combine TITLE OUTPUT.epub BOOK1.epub BOOK2.epub ...\n       epub-audio benchmark-read BOOK.epub\n       epub-audio voices")
+                print("Usage: epub-audio inspect BOOK.epub\n       epub-audio export BOOK.epub OUTPUT [--voice NAME] [--rate 175] [--bitrate 128] [--chapters | --m4b] [--skip-notes] [--read-titles] [--ffmpeg PATH]\n       epub-audio combine TITLE OUTPUT.epub BOOK1.epub BOOK2.epub ...\n       epub-audio benchmark-read BOOK.epub\n       epub-audio voices")
                 return
             }
             if args[0] == "combine", args.count >= 5 {
@@ -58,7 +58,8 @@ struct EPUBAudioCLI {
                 wordsPerMinute: Int(option("--rate") ?? "175") ?? 175,
                 bitrate: Int(option("--bitrate") ?? "128") ?? 128,
                 mode: args.contains("--m4b") ? .m4b : (args.contains("--chapters") ? .chapters : .single),
-                chapterIDs: Set(book.chapters.filter(\.includedByDefault).map(\.id)), ffmpeg: ffmpeg)
+                chapterIDs: Set(book.chapters.filter(\.includedByDefault).map(\.id)), ffmpeg: ffmpeg,
+                text: NarrationTextOptions(skipAuthorNotes: args.contains("--skip-notes"), announceChapterTitles: args.contains("--read-titles")))
             let result = try await AudiobookExporter.export(book: book, options: options, destination: URL(fileURLWithPath: args[2])) { status in
                 print("\(Int(status.fraction * 100))% \(status.message)")
             }

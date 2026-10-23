@@ -12,7 +12,7 @@ public enum AudiobookError: LocalizedError, Sendable {
 
 public struct BookChapter: Identifiable, Sendable {
     public let id: String
-    public let title: String
+    public private(set) var title: String
     public let text: String
     public let includedByDefault: Bool
     public let wordCount: Int
@@ -22,6 +22,10 @@ public struct BookChapter: Identifiable, Sendable {
         self.id = id; self.title = title; self.text = text; self.includedByDefault = includedByDefault
         self.wordCount = text.split(whereSeparator: { $0.isWhitespace }).count
         self.characterCount = text.unicodeScalars.count; self.utf8Count = text.utf8.count
+    }
+    /// The same section under another title, reusing its cached text counts.
+    public func titled(_ newTitle: String) -> BookChapter {
+        var copy = self; copy.title = newTitle; return copy
     }
 }
 
@@ -37,6 +41,29 @@ public struct EPUBBook: Sendable {
         self.title = title; self.author = author; self.language = language
         self.chapters = chapters; self.source = source; self.warnings = warnings
         self.cover = cover
+    }
+    /// Applies a custom reading order. Unknown IDs are ignored; sections missing
+    /// from the order follow in spine order, so every section is always present.
+    public func reordered(_ order: [String]?) -> EPUBBook {
+        guard let order, !order.isEmpty else { return self }
+        let byID = Dictionary(chapters.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>()
+        var arranged = order.compactMap { id in seen.insert(id).inserted ? byID[id] : nil }
+        arranged += chapters.filter { !seen.contains($0.id) }
+        guard arranged.map(\.id) != chapters.map(\.id) else { return self }
+        return EPUBBook(title: title, author: author, language: language, chapters: arranged, source: source, warnings: warnings, cover: cover)
+    }
+    /// Applies custom section titles by ID; blank or unknown entries are ignored.
+    public func retitled(_ titles: [String: String]?) -> EPUBBook {
+        guard let titles, !titles.isEmpty else { return self }
+        var changed = false
+        let renamed = chapters.map { chapter -> BookChapter in
+            guard let title = titles[chapter.id].map(EPUBReader.normalized), !title.isEmpty, title != chapter.title else { return chapter }
+            changed = true
+            return chapter.titled(title)
+        }
+        guard changed else { return self }
+        return EPUBBook(title: title, author: author, language: language, chapters: renamed, source: source, warnings: warnings, cover: cover)
     }
 }
 
@@ -93,11 +120,12 @@ public struct ExportOptions: Sendable {
     public let checkpoint: URL?
     public let usage: APIUsageLedger?
     public let budget: APIBudget?
+    public let text: NarrationTextOptions
     public init(voice: String, wordsPerMinute: Int, bitrate: Int, mode: ExportMode, chapterIDs: Set<String>, ffmpeg: URL, api: APINarration? = nil,
-                checkpoint: URL? = nil, usage: APIUsageLedger? = nil, budget: APIBudget? = nil) {
+                checkpoint: URL? = nil, usage: APIUsageLedger? = nil, budget: APIBudget? = nil, text: NarrationTextOptions = .unchanged) {
         self.voice = voice; self.wordsPerMinute = wordsPerMinute; self.bitrate = bitrate
         self.mode = mode; self.chapterIDs = chapterIDs; self.ffmpeg = ffmpeg; self.api = api
-        self.checkpoint = checkpoint; self.usage = usage; self.budget = budget
+        self.checkpoint = checkpoint; self.usage = usage; self.budget = budget; self.text = text
     }
 }
 

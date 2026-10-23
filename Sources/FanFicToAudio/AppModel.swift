@@ -7,8 +7,16 @@ import AudiobookCore
 @MainActor
 final class AppModel: ObservableObject {
     @Published var stage = 0
-    @Published var book: EPUBBook?
+    @Published var pane: WorkspacePane = .book
+    @Published var book: EPUBBook? { didSet { narrationCache = nil } }
+    @Published var coverImage: NSImage?
     @Published var selectedChapters: Set<String> = []
+    /// Section IDs in reading order; starts as the EPUB spine and can be rearranged.
+    @Published var chapterOrder: [String] = []
+    /// Custom section titles by section ID, used for narration, M4B chapters, and file names.
+    @Published var chapterTitles: [String: String] = [:]
+    @Published var renamingChapter: String?
+    @Published var renameDraft = ""
     @Published var focusedChapter: String?
     @Published var voices: [SystemVoice] = []
     @Published var voice = UserDefaults.standard.string(forKey: "selectedVoice") ?? "" {
@@ -35,8 +43,24 @@ final class AppModel: ObservableObject {
     @Published var openAIVoice = UserDefaults.standard.string(forKey: "openAIVoice") ?? "marin" { didSet { UserDefaults.standard.set(openAIVoice, forKey: "openAIVoice") } }
     @Published var elevenModel = UserDefaults.standard.string(forKey: "elevenModel") ?? "eleven_multilingual_v2" { didSet { UserDefaults.standard.set(elevenModel, forKey: "elevenModel"); restorePricing() } }
     @Published var elevenVoice = UserDefaults.standard.string(forKey: "elevenVoice") ?? "" { didSet { UserDefaults.standard.set(elevenVoice, forKey: "elevenVoice") } }
-    @Published var apiSpeed = 1.0
-    @Published var instructions = ""
+    @Published var skipAuthorNotes = UserDefaults.standard.bool(forKey: "skipAuthorNotes") {
+        didSet { UserDefaults.standard.set(skipAuthorNotes, forKey: "skipAuthorNotes"); exportedURL = nil }
+    }
+    @Published var announceChapterTitles = UserDefaults.standard.bool(forKey: "announceChapterTitles") {
+        didSet { UserDefaults.standard.set(announceChapterTitles, forKey: "announceChapterTitles"); exportedURL = nil }
+    }
+    @Published var pronunciations: [Pronunciation] = AppModel.savedPronunciations() {
+        didSet {
+            UserDefaults.standard.set(try? JSONEncoder().encode(pronunciations), forKey: "pronunciations")
+            if textOptions != NarrationTextOptions(skipAuthorNotes: skipAuthorNotes, announceChapterTitles: announceChapterTitles, pronunciations: oldValue) { exportedURL = nil }
+        }
+    }
+    @Published var apiSpeed = UserDefaults.standard.object(forKey: "apiSpeed") as? Double ?? 1.0 {
+        didSet { UserDefaults.standard.set(apiSpeed, forKey: "apiSpeed") }
+    }
+    @Published var instructions = UserDefaults.standard.string(forKey: "narrationInstructions") ?? "" {
+        didSet { UserDefaults.standard.set(instructions, forKey: "narrationInstructions") }
+    }
     @Published var apiKeyDraft = ""
     @Published var hasAPIKey = false
     @Published var apiKeyStatus = ""
@@ -45,7 +69,9 @@ final class AppModel: ObservableObject {
     @Published var seriesJobIDs: Set<UUID> = []
     @Published var seriesTitle = ""
     @Published var isCombining = false
-    @Published var mode: ExportMode = .single
+    @Published var mode = ExportMode(rawValue: UserDefaults.standard.string(forKey: "exportMode") ?? "") ?? .single {
+        didSet { UserDefaults.standard.set(mode.rawValue, forKey: "exportMode") }
+    }
     @Published var ffmpeg = SpeechTools.findFFmpeg()
     @Published var downloadInProgress = false
     @Published var isLoading = false
@@ -78,11 +104,11 @@ final class AppModel: ObservableObject {
             audiobookQueue.rememberSelection(selectedQueueJob)
             if selectedQueueJob == nil && oldValue != nil && !audiobookQueue.isRunning {
                 loadTask?.cancel(); loadGeneration = UUID(); isLoading = false
-                book = nil; selectedChapters = []; focusedChapter = nil; exportedURL = nil
+                book = nil; coverImage = nil; selectedChapters = []; chapterOrder = []; chapterTitles = [:]; focusedChapter = nil; exportedURL = nil
                 status = "Choose an EPUB to begin."; return
             }
             guard let job = audiobookQueue.jobs.first(where: { $0.id == selectedQueueJob }), !isExporting, !downloadInProgress else { return }
-            if !audiobookQueue.isRunning { loadBook(job.source, chapterIDs: job.chapterIDs, queueID: job.id) }
+            if !audiobookQueue.isRunning { loadBook(job.source, job: job, showAudiobook: false) }
         }
     }
     @Published var audiobookFolder = UserDefaults.standard.string(forKey: "audiobookQueueFolder").map { URL(fileURLWithPath: $0) } {
@@ -98,6 +124,8 @@ final class AppModel: ObservableObject {
     private var previewTask: Task<Void, Never>?
     private var exportRunner: ProcessRunner?
     private var previewRunner: ProcessRunner?
+    private struct NarrationCacheKey: Equatable { let options: NarrationTextOptions; let titles: [String: String] }
+    private var narrationCache: (key: NarrationCacheKey, book: EPUBBook)?
 
     init(storageRoot: URL = AppData.directory) {
         self.storageRoot = storageRoot
@@ -109,12 +137,15 @@ final class AppModel: ObservableObject {
             guard let self else { return }
             self.loadTask?.cancel(); self.loadGeneration = UUID(); self.isLoading = false
             self.selectedQueueJob = value.id
-            let ids = self.audiobookQueue.jobs.first(where: { $0.id == value.id })?.chapterIDs
-            self.applyBook(value.book, chapterIDs: ids)
+            let job = self.audiobookQueue.jobs.first(where: { $0.id == value.id })
+            self.applyBook(value.book, job: job, showAudiobook: false)
         }
         if let id = audiobookQueue.selectedID ?? audiobookQueue.jobs.first?.id {
             selectedQueueJob = id
-            if let job = audiobookQueue.jobs.first(where: { $0.id == id }) { loadBook(job.source, chapterIDs: job.chapterIDs, queueID: id, showAudiobook: false) }
+            if let job = audiobookQueue.jobs.first(where: { $0.id == id }) { loadBook(job.source, job: job, showAudiobook: false) }
+        }
+        audiobookQueue.onCompletion = { summary in
+            CompletionNotifier.post(title: "Audiobook queue finished", body: summary)
         }
         refreshUsage()
         queueObservation = audiobookQueue.objectWillChange.sink { [weak self] _ in
@@ -125,14 +156,40 @@ final class AppModel: ObservableObject {
     var busy: Bool { isEstimating || isLoading || isCombining || loadingAPIVoices || isExporting || downloadInProgress || audiobookQueue.isRunning }
     var canSelectQueue: Bool { !isCombining && !isEstimating && !loadingAPIVoices && !isExporting && !downloadInProgress && !audiobookQueue.isRunning }
     var selectedWordCount: Int {
-        book?.chapters.filter { selectedChapters.contains($0.id) }.reduce(0) { $0 + $1.wordCount } ?? 0
+        selectedNarratedChapters.reduce(0) { $0 + $1.wordCount }
+    }
+    /// Selected sections as they will be narrated, so estimates exclude skipped notes.
+    var selectedNarratedChapters: [BookChapter] {
+        narratedBook?.chapters.filter { selectedChapters.contains($0.id) } ?? []
+    }
+    /// The open book with custom titles and text options applied; cached between renders.
+    var narratedBook: EPUBBook? {
+        guard let book else { return nil }
+        let key = NarrationCacheKey(options: textOptions, titles: chapterTitles)
+        if let cache = narrationCache, cache.key == key { return cache.book }
+        let prepared = book.retitled(chapterTitles).narrated(textOptions)
+        narrationCache = (key, prepared)
+        return prepared
     }
     var estimatedDuration: String {
         let minutes = Int((Double(selectedWordCount) / max(1, provider == .system ? rate : 175 * apiSpeed)).rounded(.up))
         return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
     }
     var currentChapter: BookChapter? {
-        book?.chapters.first(where: { $0.id == focusedChapter }) ?? book?.chapters.first
+        let chapters = orderedChapters
+        return chapters.first(where: { $0.id == focusedChapter }) ?? chapters.first
+    }
+    var textOptions: NarrationTextOptions {
+        NarrationTextOptions(skipAuthorNotes: skipAuthorNotes, announceChapterTitles: announceChapterTitles, pronunciations: pronunciations)
+    }
+    /// The focused section's text as it will be narrated with the current text options.
+    var currentNarratedText: String? { currentChapter.map { NarrationText.prepare($0, options: textOptions) } }
+    var orderedChapters: [BookChapter] { book?.reordered(chapterOrder).retitled(chapterTitles).chapters ?? [] }
+    var customChapterTitles: [String: String]? { chapterTitles.isEmpty ? nil : chapterTitles }
+    /// The order to save with a queue entry, or nil when it matches the EPUB spine.
+    var customChapterOrder: [String]? {
+        guard let book, chapterOrder != book.chapters.map(\.id) else { return nil }
+        return chapterOrder
     }
     var filteredVoices: [SystemVoice] {
         voices.filter { $0.id == voice || voiceSearch.isEmpty || $0.label.localizedCaseInsensitiveContains(voiceSearch) }
@@ -165,12 +222,20 @@ final class AppModel: ObservableObject {
     func addToAudiobookQueue(_ urls: [URL]) {
         guard !busy else { return }
         if audiobookQueue.add(urls) > 0 { selectedQueueJob = audiobookQueue.jobs.last?.id }
-        stage = 1
+        stage = 1; pane = .queue
+    }
+
+    /// Opens EPUBs handed to the app by Finder or another app: one opens for review, several join the queue.
+    func openFiles(_ urls: [URL]) {
+        let books = urls.filter { $0.isFileURL && $0.pathExtension.lowercased() == "epub" }
+        guard !books.isEmpty else { return }
+        guard !busy else { errorMessage = "Finish or cancel the current task, then open the EPUB again."; return }
+        if books.count == 1 { loadBook(books[0]) } else { addToAudiobookQueue(books) }
     }
 
     func queueCurrentBook() {
         guard !busy, let book, !selectedChapters.isEmpty else { return }
-        if audiobookQueue.add([book.source], chapterIDs: selectedChapters) > 0 {
+        if audiobookQueue.add([book.source], chapterIDs: selectedChapters, chapterOrder: customChapterOrder, chapterTitles: customChapterTitles) > 0 {
             selectedQueueJob = audiobookQueue.jobs.last?.id
         }
     }
@@ -190,9 +255,10 @@ final class AppModel: ObservableObject {
         if audiobookFolder == nil { chooseAudiobookFolder() }
         guard let folder = audiobookFolder else { return }
         stopPreview()
+        CompletionNotifier.requestPermission()
         do {
             let settings = BatchNarrationSettings(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate, mode: mode, ffmpeg: ffmpeg,
-                api: try apiSettings(), usage: usageLedger, budget: try budget(), budgets: try queuedBudgets())
+                api: try apiSettings(), usage: usageLedger, budget: try budget(), budgets: try queuedBudgets(), text: textOptions)
             try audiobookQueue.start(settings: settings, folder: folder, keyResolver: APIKeyStore.read)
         } catch { errorMessage = error.localizedDescription }
     }
@@ -220,20 +286,22 @@ final class AppModel: ObservableObject {
         loadBook(url)
     }
 
-    func loadBook(_ url: URL, chapterIDs: Set<String>? = nil, queueID: UUID? = nil, showAudiobook: Bool = true) {
+    /// Opens a book for review. A queue job supplies its saved sections, order, and titles.
+    func loadBook(_ url: URL, job: AudiobookJob? = nil, showAudiobook: Bool = true) {
         guard !isExporting, !downloadInProgress, !isCombining, !audiobookQueue.isRunning else { return }
+        let queueID = job?.id
         if queueID == nil { selectedQueueJob = nil }
         stopPreview()
         loadTask?.cancel()
         let generation = UUID(); loadGeneration = generation
-        isLoading = true; book = nil; selectedChapters = []; focusedChapter = nil
+        isLoading = true; book = nil; coverImage = nil; selectedChapters = []; chapterOrder = []; chapterTitles = [:]; focusedChapter = nil
         exportedURL = nil; status = "Reading EPUB…"
         loadTask = Task {
             do {
                 let loaded = try await EPUBLibrary.shared.read(url)
                 try Task.checkCancellation()
                 guard generation == loadGeneration else { return }
-                applyBook(loaded, chapterIDs: chapterIDs, showAudiobook: showAudiobook)
+                applyBook(loaded, job: job, showAudiobook: showAudiobook)
                 if let queueID { audiobookQueue.updateMetadata(queueID, book: loaded) }
             } catch is CancellationError {} catch {
                 guard generation == loadGeneration else { return }
@@ -244,11 +312,15 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func applyBook(_ loaded: EPUBBook, chapterIDs: Set<String>? = nil, showAudiobook: Bool = true) {
+    private func applyBook(_ loaded: EPUBBook, job: AudiobookJob? = nil, showAudiobook: Bool = true) {
         book = loaded; exportedURL = nil
-        if showAudiobook { stage = 1 }
-        selectedChapters = chapterIDs ?? Set(loaded.chapters.filter(\.includedByDefault).map(\.id))
-        focusedChapter = loaded.chapters.first?.id; status = "Ready to narrate."
+        coverImage = loaded.cover.flatMap(NSImage.init(data:))
+        if showAudiobook { stage = 1; pane = .book }
+        selectedChapters = job?.chapterIDs ?? Set(loaded.chapters.filter(\.includedByDefault).map(\.id))
+        chapterOrder = loaded.reordered(job?.chapterOrder).chapters.map(\.id)
+        let known = Set(loaded.chapters.map(\.id))
+        chapterTitles = (job?.chapterTitles ?? [:]).filter { known.contains($0.key) }
+        focusedChapter = chapterOrder.first; status = "Ready to narrate."
     }
 
     var narrationReady: Bool {
@@ -320,6 +392,80 @@ final class AppModel: ObservableObject {
         exportedURL = nil
     }
 
+    func moveChapters(from source: IndexSet, to destination: Int) {
+        guard !busy else { return }
+        var ids = orderedChapters.map(\.id)
+        ids.move(fromOffsets: source, toOffset: destination)
+        chapterOrder = ids; exportedURL = nil
+    }
+
+    func canMoveChapter(_ id: String, by offset: Int) -> Bool {
+        guard !busy, let index = chapterOrder.firstIndex(of: id) else { return false }
+        return chapterOrder.indices.contains(index + offset)
+    }
+
+    /// Moves a section by an offset, clamped to the first or last position.
+    func moveChapter(_ id: String, by offset: Int) {
+        guard !busy, let index = orderedChapters.firstIndex(where: { $0.id == id }) else { return }
+        let target = min(max(index + offset, 0), chapterOrder.count - 1)
+        guard target != index else { return }
+        moveChapters(from: [index], to: target > index ? target + 1 : target)
+    }
+
+    func restoreSpineOrder() {
+        guard !busy, let book else { return }
+        chapterOrder = book.chapters.map(\.id); exportedURL = nil
+    }
+
+    /// Whether the open book is this job's EPUB. Paths are compared after resolving links,
+    /// since the reader resolves them (for example, /private/tmp becomes /tmp).
+    func isOpen(_ job: AudiobookJob) -> Bool {
+        guard let book else { return false }
+        return book.source.resolvingSymlinksInPath().standardizedFileURL == job.source.resolvingSymlinksInPath().standardizedFileURL
+    }
+
+    func originalTitle(_ id: String) -> String { book?.chapters.first(where: { $0.id == id })?.title ?? "" }
+
+    /// A blank title, or the book's own title, removes the custom title.
+    func renameChapter(_ id: String, to title: String) {
+        guard !busy, book != nil else { return }
+        let cleaned = title.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        chapterTitles[id] = cleaned.isEmpty || cleaned == originalTitle(id) ? nil : cleaned
+        exportedURL = nil
+    }
+
+    /// The current controls as a credential-free preset, for comparing with a book's saved settings.
+    func presetFromControls() -> NarrationPreset {
+        let api = provider == .system ? nil : APINarration(provider: provider, model: provider == .openAI ? openAIModel : elevenModel,
+            voice: provider == .openAI ? openAIVoice : elevenVoice, speed: apiSpeed, instructions: instructions, apiKey: "")
+        return NarrationPreset(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate, mode: mode, api: api, text: textOptions)
+    }
+
+    /// Copies a book's saved settings into the controls, which also become the defaults for new books.
+    func useInControls(_ preset: NarrationPreset) {
+        guard !busy else { return }
+        provider = preset.provider
+        switch preset.provider {
+        case .system:
+            // A preset from another Mac may name a voice that isn't installed here.
+            if voices.isEmpty || voices.contains(where: { $0.name == preset.voice }) { voice = preset.voice }
+            else { errorMessage = "The saved voice “\(preset.voice)” isn’t installed on this Mac, so the current voice was kept." }
+            rate = Double(preset.wordsPerMinute)
+        case .openAI: openAIModel = preset.model; openAIVoice = preset.apiVoice; instructions = preset.instructions
+        case .elevenLabs: elevenModel = preset.model; elevenVoice = preset.apiVoice
+        }
+        if preset.provider != .system { apiSpeed = min(preset.provider.speedRange.upperBound, max(preset.provider.speedRange.lowerBound, preset.speed)) }
+        bitrate = preset.bitrate; mode = preset.mode
+        let text = preset.textOptions
+        skipAuthorNotes = text.skipAuthorNotes; announceChapterTitles = text.announceChapterTitles
+        // Keep the global list when the preset never changed pronunciations.
+        if preset.text != nil { pronunciations = text.pronunciations }
+    }
+
+    private static func savedPronunciations() -> [Pronunciation] {
+        UserDefaults.standard.data(forKey: "pronunciations").flatMap { try? JSONDecoder().decode([Pronunciation].self, from: $0) } ?? []
+    }
+
     func chooseFFmpeg() {
         let panel = NSOpenPanel()
         panel.message = "Select the FFmpeg executable used to encode MP3 files."
@@ -340,7 +486,8 @@ final class AppModel: ObservableObject {
     func preview() {
         if isPreviewing { stopPreview(); return }
         guard narrationReady, !busy else { return }
-        let text = currentChapter?.text ?? "Welcome. This is a preview of the voice for your audiobook. Choose a speaking speed that feels comfortable to you."
+        let narrated = currentNarratedText.flatMap { $0.isEmpty ? nil : $0 }
+        let text = narrated ?? "Welcome. This is a preview of the voice for your audiobook. Choose a speaking speed that feels comfortable to you."
         let sample = SpeechText.preview(text, provider: provider)
         let api: APINarration?
         do { api = try apiSettings(); _ = try budget() } catch { errorMessage = error.localizedDescription; return }
@@ -405,9 +552,11 @@ final class AppModel: ObservableObject {
             destination = candidate
         }
         stopPreview()
+        CompletionNotifier.requestPermission()
+        let ordered = book.reordered(chapterOrder).retitled(chapterTitles)
         let options = ExportOptions(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate,
             mode: mode, chapterIDs: selectedChapters, ffmpeg: ffmpeg, api: api,
-            checkpoint: singleCheckpoint(book), usage: usageLedger, budget: try? budget())
+            checkpoint: singleCheckpoint(book), usage: usageLedger, budget: try? budget(), text: textOptions)
         let runner = ProcessRunner()
         exportRunner = runner
         isExporting = true
@@ -416,7 +565,7 @@ final class AppModel: ObservableObject {
         status = "Preparing audiobook…"
         exportTask = Task { [self] in
             do {
-                let result = try await AudiobookExporter.export(book: book, options: options, destination: destination, runner: runner) { [weak self] update in
+                let result = try await AudiobookExporter.export(book: ordered, options: options, destination: destination, runner: runner) { [weak self] update in
                     Task { @MainActor [weak self] in
                         self?.progress = update.fraction
                         self?.status = update.message
@@ -425,6 +574,7 @@ final class AppModel: ObservableObject {
                 exportedURL = result
                 progress = 1
                 status = "Your audiobook is ready."
+                CompletionNotifier.post(title: "Audiobook ready", body: book.title)
             } catch is CancellationError {
                 status = "Export cancelled."
                 progress = 0
@@ -432,6 +582,7 @@ final class AppModel: ObservableObject {
                 errorMessage = error.localizedDescription
                 status = "Export failed."
                 progress = 0
+                CompletionNotifier.post(title: "Audiobook export failed", body: book.title)
             }
             refreshUsage()
             isExporting = false
@@ -462,4 +613,9 @@ final class AppModel: ObservableObject {
         await exportTask?.value
         await previewTask?.value
     }
+}
+
+enum WorkspacePane: String, CaseIterable, Identifiable {
+    case narration = "Voice & Text", book = "Open Book", queue = "Queue"
+    var id: String { rawValue }
 }

@@ -48,7 +48,14 @@ struct NarrationSettingsView: View {
                 Text("AI-generated voice. Preview and conversion send book text to \(model.provider.rawValue); API usage is billed by that provider.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-        }.padding(20).background(Color.white, in: RoundedRectangle(cornerRadius: 12))
+            Divider()
+            HStack(spacing: 24) {
+                Toggle("Skip author’s notes", isOn: $model.skipAuthorNotes)
+                Toggle("Read chapter titles aloud", isOn: $model.announceChapterTitles)
+            }.toggleStyle(.checkbox)
+            Text("Skipping removes paragraphs that start like “A/N:”, “Author’s Note”, “Disclaimer”, or “Notes:”, including a whole note block before the first scene break or at the end of a section. Titles are added only to sections that don’t already open with one. Check the text preview for the result.")
+                .font(.caption).foregroundStyle(.secondary)
+        }.padding(20).background(AppTheme.card, in: RoundedRectangle(cornerRadius: 12))
             .disabled(model.busy)
             .onChange(of: model.voice) { _, _ in model.stopPreview() }
             .onChange(of: model.rate) { _, _ in model.stopPreview() }

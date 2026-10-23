@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.0 — Unreleased
+
+- Split **Create Audiobook** into **Voice & Text**, **Open Book**, and **Queue** panes, with a narration summary and **Change…** shortcut where books are exported.
+- Drag sections into a custom reading order, move them from a context menu, or restore the EPUB order. Rename sections for M4B chapters, chapter files, and read-aloud titles. Orders and titles are saved with queue entries.
+- Optionally skip author's notes, disclaimers, and archive notes, and read chapter titles aloud when a section doesn't start with one. Add a global pronunciation list for names and invented words. Text and voice previews show the narrated result.
+- Send up to three OpenAI or two ElevenLabs speech requests at once during export while encoding in order; failed requests are still never retried automatically.
+- Show each queued book's saved settings, warn when they differ from the current controls, and add **Use in Controls** and **Clear Saved Settings**.
+- Notify when an export or the audiobook queue finishes while the app is in the background.
+- Remember AI speed, OpenAI narration style, and output format between launches. Restore the download list after relaunch; interrupted downloads wait to be started again.
+- Estimate words, listening time, and AI usage from the text that will be narrated.
+- Show EPUB cover art, support dark mode, and open EPUBs from Finder: one opens for review, several join the queue.
+- Saved queues, presets, and completed passages from 1.4 remain compatible.
+
 ## 1.4.0 — 2026-10-12
 
 - Accept supported story pages and direct EPUB links in one Download by Link flow, including redirects and opaque EPUB endpoints.

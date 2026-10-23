@@ -121,6 +121,24 @@ struct ImprovementsTests {
         #expect(try restored.cached("part-0-0.mp3") == nil)
     }
 
+    @Test func reorderingKeepsEverySectionAndSeparatesCheckpoints() throws {
+        let root = try directory(); defer { try? FileManager.default.removeItem(at: root) }
+        let original = EPUBBook(title: "Order", author: "Test", language: "en", chapters: ["a", "b", "c"].map {
+            BookChapter(id: $0, title: $0.uppercased(), text: "Text \($0).")
+        }, source: root.appendingPathComponent("book.epub"))
+        #expect(original.reordered(nil).chapters.map(\.id) == ["a", "b", "c"])
+        #expect(original.reordered(["c", "a", "b"]).chapters.map(\.id) == ["c", "a", "b"])
+        // Unknown and repeated IDs are ignored; omitted sections follow in spine order.
+        #expect(original.reordered(["c", "missing", "c"]).chapters.map(\.id) == ["c", "a", "b"])
+        let options = ExportOptions(voice: "", wordsPerMinute: 175, bitrate: 192, mode: .single, chapterIDs: ["a", "b", "c"],
+            ffmpeg: URL(fileURLWithPath: "/usr/bin/true"), api: api())
+        let checkpoints = root.appendingPathComponent("checkpoints")
+        let spine = try ConversionCheckpoint(root: checkpoints, book: original, options: options).directory
+        #expect(try ConversionCheckpoint(root: checkpoints, book: original.reordered(["a", "b", "c"]), options: options).directory == spine)
+        // Passage files are named by position, so a new order must not reuse them.
+        #expect(try ConversionCheckpoint(root: checkpoints, book: original.reordered(["b", "a"]), options: options).directory != spine)
+    }
+
     @Test func interruptedAPIExportResumesWithoutResendingCompletedPassage() async throws {
         let ffmpeg = try #require(SpeechTools.findFFmpeg())
         let root = try directory(); defer { try? FileManager.default.removeItem(at: root) }

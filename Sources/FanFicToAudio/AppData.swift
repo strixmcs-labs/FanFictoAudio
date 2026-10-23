@@ -56,9 +56,8 @@ enum AppData {
         }
     }
     var openBookEstimate: String {
-        guard provider != .system, let book else { return "" }
-        let chapters = book.chapters.filter { selectedChapters.contains($0.id) }
-        return estimateDescription(chapters, speed: apiSpeed, budget: try? budget())
+        guard provider != .system, book != nil else { return "" }
+        return estimateDescription(selectedNarratedChapters, speed: apiSpeed, budget: try? budget())
     }
     func estimateDescription(_ chapters: [BookChapter], speed: Double, budget: APIBudget?) -> String {
         let count = chapters.reduce(0) { $0 + $1.characterCount }
@@ -80,7 +79,8 @@ enum AppData {
                     guard jobProvider != .system else { continue }
                     let book = try await EPUBLibrary.shared.read(job.source)
                     let ids = job.chapterIDs ?? Set(book.chapters.filter(\.includedByDefault).map(\.id))
-                    let chapters = book.chapters.filter { ids.contains($0.id) }
+                    let narrated = book.retitled(job.chapterTitles).narrated(preset?.textOptions ?? textOptions)
+                    let chapters = narrated.chapters.filter { ids.contains($0.id) }
                     let characterCount = chapters.reduce(0) { $0 + $1.characterCount }
                     let policy = try budget(priceID: preset?.pricingID)
                     let estimate = policy.estimate(characters: characterCount, bytes: chapters.reduce(0) { $0 + $1.utf8Count },
@@ -95,8 +95,8 @@ enum AppData {
     func saveSelectedJobSettings() {
         guard !busy, let id = selectedQueueJob else { return }
         do {
-            let preset = NarrationPreset(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate, mode: mode, api: try apiSettings())
-            audiobookQueue.updateSettings(id, chapterIDs: selectedChapters, narration: preset)
+            let preset = NarrationPreset(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate, mode: mode, api: try apiSettings(), text: textOptions)
+            audiobookQueue.updateSettings(id, chapterIDs: selectedChapters, chapterOrder: customChapterOrder, chapterTitles: customChapterTitles, narration: preset)
             queueEstimate = ""
         } catch { errorMessage = error.localizedDescription }
     }

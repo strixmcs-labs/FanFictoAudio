@@ -11,13 +11,11 @@ struct FanFicToAudioApp: App {
         Window("FanFic to Audio", id: "main") {
             WorkflowView(audio: model, download: download)
                 .frame(minWidth: 1060, minHeight: 700)
-                .preferredColorScheme(.light)
                 .task {
                     delegate.model = model
                     delegate.download = download
                     await model.loadVoices()
                 }
-                .onOpenURL { model.loadBook($0) }
         }
         .defaultSize(width: 1180, height: 820)
         .commands {
@@ -43,15 +41,22 @@ struct FanFicToAudioApp: App {
                 Text("Download voices in System Settings → Accessibility → Read & Speak (called Spoken Content on earlier macOS versions). Then refresh the voice list.")
                 Button("Refresh Voices") { Task { await model.loadVoices() } }.disabled(model.busy || model.isPreviewing)
             }
-            .padding(24).frame(width: 470).background(Color.white).tint(AppTheme.oxblood).preferredColorScheme(.light)
+            .padding(24).frame(width: 470).background(AppTheme.background).tint(AppTheme.oxblood)
         }
     }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    weak var model: AppModel?
+    weak var model: AppModel? {
+        didSet { if let model, !pendingOpen.isEmpty { model.openFiles(pendingOpen); pendingOpen = [] } }
+    }
     weak var download: DownloadModel?
+    // Files opened from Finder can arrive before the window has connected the model.
+    private var pendingOpen: [URL] = []
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if let model { model.openFiles(urls) } else { pendingOpen += urls }
+    }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let model else { return .terminateNow }
         Task {
