@@ -1,8 +1,22 @@
 # Validation
 
-Last checked: October 12, 2026. Candidate: **1.4.0**, build **5**.
+Last checked: October 23, 2026. Candidate: **1.5.0**, build **6**.
 
-## Version 1.4 checks
+## Version 1.5 checks
+
+- **72 native tests passed**: 61 audiobook tests, 5 download-bridge tests, and 6 app-model tests. **50 Python tests passed**, with two upstream deprecation warnings. GitHub Actions passed on the merged source.
+- New coverage includes author's-note detection and prose that must be kept, short-section safety, read-aloud title de-duplication, pronunciations, section renaming, custom reading order (including checkpoint separation for reordered books), backward-compatible decoding of 1.4 queues/presets/text options, Finder opening, and download-list restoration.
+- Parallel AI speech requests reached the OpenAI limit of three while M4B chapter boundaries stayed in reading order with the expected per-section durations. A forced failure of the first passage after later passages returned confirmed those passages were saved and not requested again on retry; this test fails with the safeguard removed. Provider responses are mocked; no paid TTS requests were made.
+- The command-line exporter produced an M4B from a synthetic fanfic EPUB with `--skip-notes --read-titles` (11.5 s, two chapter markers) versus 20.5 s without the flags.
+- Native interface checks in a development bundle with isolated app data covered dragging a section and restoring the EPUB order; the Voice & Text, Open Book, and Queue panes in dark mode; the narrated-text preview with notes skipped, titles added, and a pronunciation applied; a queued book's saved-settings warning clearing after **Use in Controls**; and opening an EPUB from Finder, which loaded directly with its cover. The Rename context menu, notification banners, and drag gestures beyond one move were not exercised in the interface.
+- All nested code and the app were signed with Developer ID Application, team `CF67T8RW6F`, hardened runtime, and secure timestamps, from source identical to `main` at the merge of pull request #3. The signed bundle passed deep/strict verification and the packaged helper/local narration smoke check (single MP3, chapter MP3s, M4B, metadata, 192 kbps streams).
+- Apple accepted the app submission `560dc1ee-2d19-418d-9548-aeab6f3fac54` and the DMG submission `7abafd09-d11e-47cc-bf29-4a1a646df9e8`; both tickets were stapled and validated. The app extracted from the release ZIP and the DMG both assess as `Notarized Developer ID`.
+- The release is Apple silicon / macOS 14 or later and bundles Python, FanFicFare, and the standalone FFmpeg/LAME encoder with matching sources and license notices.
+- Live paid TTS calls (including provider rate limits under parallel requests), installation on another Mac, Intel packaging, and subjective narration quality were not verified.
+
+## Version 1.4 historical validation
+
+Checked October 12, 2026: version 1.4.0, build 5.
 
 - **51 native tests passed**: 43 audiobook tests, 5 download-bridge tests, and 3 app-model tests. **50 Python tests passed**, with two upstream deprecation warnings.
 - Direct-link regressions use a local HTTP server and authored EPUBs: redirects, opaque endpoints, duplicate preservation, HTTP/HTML rejection, missing chapters, advertised/streaming size limits, compressed resource limits, entity rejection, standard XHTML DOCTYPE acceptance, and publication acknowledgement failure. Existing offline FanFicFare story downloads still pass.
