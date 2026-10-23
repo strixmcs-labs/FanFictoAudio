@@ -31,6 +31,12 @@ The audiobook queue, order, selected row, per-book presets, and output folder su
 
 Completed passages are saved under `~/Library/Application Support/FanFicToAudio/Checkpoints`. Both individual and queued exports can reuse them. Reuse requires matching text, section choices, voice, provider/model/style/speed, bitrate, and output format; cached bytes are checksum-verified. The currently unfinished passage may be sent and charged again. Completed exports remove their matching checkpoint. Older checkpoints with different settings remain until the job is removed or **Discard Saved Passages** is selected; single-book leftovers can be removed from that folder while the app is idle. **Clear Folder** resets only the output folder choice.
 
+## Reading order and narrated text
+
+Drag sections in the **Reading order** sidebar to change their order, or right-click a section to move it to the top, up, down, or bottom. **Restore** (or **Restore EPUB Order** in the checklist menu) returns to the book's spine order. Exports, M4B chapter markers, chapter file numbering, and saved queue settings follow the custom order.
+
+Under **Narration**, **Skip author's notes** leaves out paragraphs that begin like "A/N:", "Author's Note", "T/N:", "Disclaimer", or "Notes:", and inline "(A/N: …)" asides. A note at the start of a section is removed through the first scene break (such as `***` or `oOo`) when one follows closely; a short note at the end of a section is removed with everything after it. A section containing only notes is skipped. **Read chapter titles aloud** adds the section title before sections whose text does not already begin with it; FanFicFare EPUBs normally include the heading already. The text preview and voice preview show the result. Both choices are saved with **Save Current Settings & Sections for Selected Book** and apply to queue entries without a saved preset.
+
 ## Combine books into a series
 
 Check the boxes beside the waiting EPUBs, or click **Select Waiting EPUBs**. Use **Move Up** and **Move Down** to set their reading order, enter a **Series title**, then click **Combine Selected EPUBs…**. Save the combined book with a new filename.

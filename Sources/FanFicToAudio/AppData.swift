@@ -95,8 +95,8 @@ enum AppData {
     func saveSelectedJobSettings() {
         guard !busy, let id = selectedQueueJob else { return }
         do {
-            let preset = NarrationPreset(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate, mode: mode, api: try apiSettings())
-            audiobookQueue.updateSettings(id, chapterIDs: selectedChapters, narration: preset)
+            let preset = NarrationPreset(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate, mode: mode, api: try apiSettings(), text: textOptions)
+            audiobookQueue.updateSettings(id, chapterIDs: selectedChapters, chapterOrder: customChapterOrder, narration: preset)
             queueEstimate = ""
         } catch { errorMessage = error.localizedDescription }
     }

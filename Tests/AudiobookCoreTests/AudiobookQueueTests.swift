@@ -173,6 +173,43 @@ struct AudiobookQueueTests {
         #expect(queue.jobs.filter { $0.state == .done }.count == 3)
     }
 
+    @Test func customChapterOrderPersistsAndReachesOnlyTheExport() async throws {
+        let root = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let sources = try fixtures(root, names: ["one.epub", "two.epub"])
+        let storage = root.appendingPathComponent("queue.json")
+        let queue = AudiobookQueue(storage: storage)
+        queue.add([sources[0]], chapterIDs: ["one", "extra"], chapterOrder: ["extra", "one"])
+        queue.add([sources[1]])
+        queue.updateSettings(queue.jobs[1].id, chapterIDs: ["one"], chapterOrder: ["extra", "one"], narration: nil)
+        queue.updateSettings(queue.jobs[1].id, chapterIDs: ["one"], chapterOrder: nil, narration: nil)
+        let recorder = QueueRecorder()
+        let restored = AudiobookQueue(storage: storage, reader: Self.readFixture, exporter: { book, options, destination, runner, progress in
+            try await recorder.export(book, options, destination, runner, progress)
+        })
+        #expect(restored.jobs.map(\.chapterOrder) == [["extra", "one"], nil])
+        try restored.start(settings: settings(), folder: root)
+        await restored.waitUntilFinished()
+        #expect(await recorder.chapterOrders == [["extra", "one"], ["one", "extra"]])
+        // The open book stays in spine order so the sidebar can restore it.
+        #expect(restored.activeBook?.book.chapters.map(\.id) == ["one", "extra"])
+    }
+
+    @Test func textOptionsReachTheExportAndAreSavedWithTheJob() async throws {
+        let root = try fixtureDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let source = try fixtures(root, names: ["one.epub"])[0]
+        let recorder = QueueRecorder()
+        let queue = AudiobookQueue(reader: Self.readFixture, exporter: { book, options, destination, runner, progress in
+            try await recorder.export(book, options, destination, runner, progress)
+        })
+        queue.add([source])
+        let text = NarrationTextOptions(skipAuthorNotes: true, announceChapterTitles: true)
+        try queue.start(settings: BatchNarrationSettings(voice: "Test Voice", wordsPerMinute: 200, bitrate: 96, mode: .single,
+            ffmpeg: URL(fileURLWithPath: "/usr/bin/true"), text: text), folder: root)
+        await queue.waitUntilFinished()
+        #expect(await recorder.calls.map(\.text) == [text])
+        #expect(queue.jobs[0].narration?.textOptions == text)
+    }
+
     private func settings(voice: String = "Test Voice", mode: ExportMode = .single) -> BatchNarrationSettings {
         BatchNarrationSettings(voice: voice, wordsPerMinute: 200, bitrate: 96, mode: mode, ffmpeg: URL(fileURLWithPath: "/usr/bin/true"))
     }
@@ -200,13 +237,14 @@ struct AudiobookQueueTests {
 private actor QueueRecorder {
     var calls: [ExportOptions] = []
     var sources: [URL] = []
+    var chapterOrders: [[String]] = []
     var active = 0
     var maximumActive = 0
     private var delayFirst: Bool
     init(delayFirst: Bool = false) { self.delayFirst = delayFirst }
     func export(_ book: EPUBBook, _ options: ExportOptions, _ destination: URL,
                 _ runner: ProcessRunner, _ progress: @Sendable (ExportProgress) -> Void) async throws -> URL {
-        sources.append(book.source)
+        sources.append(book.source); chapterOrders.append(book.chapters.map(\.id))
         calls.append(options); active += 1; maximumActive = max(maximumActive, active)
         defer { active -= 1 }
         progress(ExportProgress(0.2, "Working…"))

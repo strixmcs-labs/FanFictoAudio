@@ -11,11 +11,16 @@ public struct NarrationPreset: Codable, Sendable {
     public let wordsPerMinute: Int
     public let bitrate: Int
     public let mode: ExportMode
+    /// Omitted when unchanged, so presets saved before this option still decode and
+    /// checkpoint fingerprints for unchanged text stay the same.
+    public let text: NarrationTextOptions?
     public var pricingID: String { provider.rawValue + "." + model }
-    public init(voice: String, wordsPerMinute: Int, bitrate: Int, mode: ExportMode, api: APINarration?) {
+    public var textOptions: NarrationTextOptions { text ?? .unchanged }
+    public init(voice: String, wordsPerMinute: Int, bitrate: Int, mode: ExportMode, api: APINarration?, text: NarrationTextOptions = .unchanged) {
         provider = api?.provider ?? .system; model = api?.model ?? ""; apiVoice = api?.voice ?? ""
         speed = api?.speed ?? 1; instructions = api?.instructions ?? ""
         self.voice = voice; self.wordsPerMinute = wordsPerMinute; self.bitrate = bitrate; self.mode = mode
+        self.text = text.isUnchanged ? nil : text
     }
     public func api(key: String) -> APINarration? {
         provider == .system ? nil : APINarration(provider: provider, model: model, voice: apiVoice, speed: speed, instructions: instructions, apiKey: key)

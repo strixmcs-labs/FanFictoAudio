@@ -59,7 +59,9 @@ struct AudiobookQueueView: View {
                                         Text(job.title).font(.callout.weight(.medium)).lineLimit(2)
                                         if !job.author.isEmpty { Text(job.author).font(.caption).foregroundStyle(.secondary) }
                                         if let preset = job.narration {
-                                            Text("\(preset.provider.rawValue) · \(preset.provider == .system ? preset.voice : preset.apiVoice) · \(preset.mode.rawValue)")
+                                            Text(([preset.provider.rawValue, preset.provider == .system ? preset.voice : preset.apiVoice, preset.mode.rawValue]
+                                                  + (preset.textOptions.skipAuthorNotes ? ["skips author’s notes"] : [])
+                                                  + (preset.textOptions.announceChapterTitles ? ["reads titles"] : [])).joined(separator: " · "))
                                                 .font(.caption2).foregroundStyle(.secondary)
                                         }
                                         Text(job.message).font(.caption).foregroundStyle(job.state == .failed ? .red : .secondary).lineLimit(3)

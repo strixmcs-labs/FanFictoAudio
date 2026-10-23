@@ -8,8 +8,13 @@ public enum AudiobookExporter {
                               runner: ProcessRunner = ProcessRunner(),
                               apiClient: APISpeechClient = APISpeechClient(),
                               progress: @escaping @Sendable (ExportProgress) -> Void = { _ in }) async throws -> URL {
+        guard book.chapters.contains(where: { options.chapterIDs.contains($0.id) }) else {
+            throw AudiobookError.conversion("Select at least one chapter to export.")
+        }
+        // Checkpoints fingerprint the prepared text, so changed text options never reuse passages.
+        let book = book.narrated(options.text)
         let chapters = book.chapters.filter { options.chapterIDs.contains($0.id) }
-        guard !chapters.isEmpty else { throw AudiobookError.conversion("Select at least one chapter to export.") }
+        guard !chapters.isEmpty else { throw AudiobookError.conversion("No text remains in the selected sections after skipping author’s notes.") }
         try options.api?.validate()
         guard SpeechRate.allowedRange.contains(options.wordsPerMinute), [64, 96, 128, 192].contains(options.bitrate), options.api != nil || !options.voice.isEmpty else {
             throw AudiobookError.conversion("Invalid voice, speaking speed, or audio quality.")

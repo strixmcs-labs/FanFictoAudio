@@ -38,6 +38,17 @@ public struct EPUBBook: Sendable {
         self.chapters = chapters; self.source = source; self.warnings = warnings
         self.cover = cover
     }
+    /// Applies a custom reading order. Unknown IDs are ignored; sections missing
+    /// from the order follow in spine order, so every section is always present.
+    public func reordered(_ order: [String]?) -> EPUBBook {
+        guard let order, !order.isEmpty else { return self }
+        let byID = Dictionary(chapters.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>()
+        var arranged = order.compactMap { id in seen.insert(id).inserted ? byID[id] : nil }
+        arranged += chapters.filter { !seen.contains($0.id) }
+        guard arranged.map(\.id) != chapters.map(\.id) else { return self }
+        return EPUBBook(title: title, author: author, language: language, chapters: arranged, source: source, warnings: warnings, cover: cover)
+    }
 }
 
 public struct SystemVoice: Identifiable, Hashable, Sendable {
@@ -93,11 +104,12 @@ public struct ExportOptions: Sendable {
     public let checkpoint: URL?
     public let usage: APIUsageLedger?
     public let budget: APIBudget?
+    public let text: NarrationTextOptions
     public init(voice: String, wordsPerMinute: Int, bitrate: Int, mode: ExportMode, chapterIDs: Set<String>, ffmpeg: URL, api: APINarration? = nil,
-                checkpoint: URL? = nil, usage: APIUsageLedger? = nil, budget: APIBudget? = nil) {
+                checkpoint: URL? = nil, usage: APIUsageLedger? = nil, budget: APIBudget? = nil, text: NarrationTextOptions = .unchanged) {
         self.voice = voice; self.wordsPerMinute = wordsPerMinute; self.bitrate = bitrate
         self.mode = mode; self.chapterIDs = chapterIDs; self.ffmpeg = ffmpeg; self.api = api
-        self.checkpoint = checkpoint; self.usage = usage; self.budget = budget
+        self.checkpoint = checkpoint; self.usage = usage; self.budget = budget; self.text = text
     }
 }
 

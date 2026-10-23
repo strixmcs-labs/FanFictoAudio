@@ -15,12 +15,15 @@ public struct AudiobookJob: Identifiable, Sendable, Codable {
     public var message = "Waiting to convert."
     public var output: URL?
     public var chapterIDs: Set<String>?
+    /// Section IDs in a custom reading order; nil follows the EPUB spine.
+    public var chapterOrder: [String]?
     public var narration: NarrationPreset?
 
-    public init(source: URL, chapterIDs: Set<String>? = nil) {
+    public init(source: URL, chapterIDs: Set<String>? = nil, chapterOrder: [String]? = nil) {
         self.source = source
         self.title = source.deletingPathExtension().lastPathComponent
         self.chapterIDs = chapterIDs
+        self.chapterOrder = chapterOrder
     }
 }
 
@@ -34,11 +37,13 @@ public struct BatchNarrationSettings: Sendable {
     public let usage: APIUsageLedger?
     public let budget: APIBudget?
     public let budgets: [String: APIBudget]
-    public init(voice: String, wordsPerMinute: Int, bitrate: Int, mode: ExportMode, ffmpeg: URL, api: APINarration? = nil, usage: APIUsageLedger? = nil, budget: APIBudget? = nil, budgets: [String: APIBudget] = [:]) {
+    public let text: NarrationTextOptions
+    public init(voice: String, wordsPerMinute: Int, bitrate: Int, mode: ExportMode, ffmpeg: URL, api: APINarration? = nil, usage: APIUsageLedger? = nil, budget: APIBudget? = nil, budgets: [String: APIBudget] = [:],
+                text: NarrationTextOptions = .unchanged) {
         self.voice = voice; self.wordsPerMinute = wordsPerMinute; self.bitrate = bitrate
         self.mode = mode; self.ffmpeg = ffmpeg; self.api = api
         self.usage = usage; self.budget = budget
-        self.budgets = budgets
+        self.budgets = budgets; self.text = text
     }
 }
 
@@ -105,14 +110,14 @@ public final class AudiobookQueue: ObservableObject {
     public var queuedCount: Int { jobs.filter { $0.state == .queued }.count }
     public func rememberSelection(_ id: UUID?) { selectedID = id; persist() }
 
-    @discardableResult public func add(_ urls: [URL], chapterIDs: Set<String>? = nil) -> Int {
+    @discardableResult public func add(_ urls: [URL], chapterIDs: Set<String>? = nil, chapterOrder: [String]? = nil) -> Int {
         guard !isRunning else { return 0 }
         var pending = Set(jobs.filter { [.queued, .running].contains($0.state) }.map { $0.source.resolvingSymlinksInPath().standardizedFileURL })
         var added = 0
         for url in urls where url.isFileURL && url.pathExtension.lowercased() == "epub" {
             let canonical = url.resolvingSymlinksInPath().standardizedFileURL
             if pending.insert(canonical).inserted {
-                jobs.append(AudiobookJob(source: url, chapterIDs: chapterIDs)); added += 1
+                jobs.append(AudiobookJob(source: url, chapterIDs: chapterIDs, chapterOrder: chapterOrder)); added += 1
             }
         }
         if added > 0 { summary = "\(queuedCount) " + (queuedCount == 1 ? "EPUB ready to convert." : "EPUBs ready to convert.") }
@@ -162,9 +167,9 @@ public final class AudiobookQueue: ObservableObject {
         jobs[index].message = "Waiting to retry."; jobs[index].output = nil
     }
 
-    public func updateSettings(_ id: UUID, chapterIDs: Set<String>, narration: NarrationPreset?) {
+    public func updateSettings(_ id: UUID, chapterIDs: Set<String>, chapterOrder: [String]? = nil, narration: NarrationPreset?) {
         guard !isRunning, let index = jobs.firstIndex(where: { $0.id == id }), jobs[index].state != .done else { return }
-        jobs[index].chapterIDs = chapterIDs; jobs[index].narration = narration
+        jobs[index].chapterIDs = chapterIDs; jobs[index].chapterOrder = chapterOrder; jobs[index].narration = narration
     }
 
     public func move(_ id: UUID, before target: UUID) {
@@ -199,7 +204,7 @@ public final class AudiobookQueue: ObservableObject {
         guard folder.isFileURL else { throw AudiobookError.conversion("Choose a local output folder.") }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let preset = NarrationPreset(voice: settings.voice, wordsPerMinute: settings.wordsPerMinute,
-            bitrate: settings.bitrate, mode: settings.mode, api: settings.api)
+            bitrate: settings.bitrate, mode: settings.mode, api: settings.api, text: settings.text)
         var keys: [NarrationProvider: String] = [:]
         // Resolve credentials before starting the batch, without writing them to disk.
         for job in jobs where job.state == .queued {
@@ -224,6 +229,7 @@ public final class AudiobookQueue: ObservableObject {
                 summary = "Converting \(batchFinished + 1) of \(batchIDs.count): \(jobs[index].title)"
                 let source = jobs[index].source
                 let selectedIDs = jobs[index].chapterIDs
+                let order = jobs[index].chapterOrder
                 let processRunner = ProcessRunner()
                 runner = processRunner
                 do {
@@ -238,10 +244,12 @@ public final class AudiobookQueue: ObservableObject {
                     let options = ExportOptions(voice: narration.voice, wordsPerMinute: narration.wordsPerMinute,
                         bitrate: narration.bitrate, mode: narration.mode, chapterIDs: chapterIDs, ffmpeg: settings.ffmpeg,
                         api: narration.api(key: keys[narration.provider] ?? ""),
-                        checkpoint: checkpointRoot?.appendingPathComponent(id.uuidString), usage: settings.usage, budget: budget)
+                        checkpoint: checkpointRoot?.appendingPathComponent(id.uuidString), usage: settings.usage, budget: budget,
+                        text: narration.textOptions)
                     let destination = Self.uniqueDestination(title: book.title, folder: folder, mode: narration.mode)
                     jobs[index].output = destination
-                    let result = try await exporter(book, options, destination, processRunner) { [weak self] update in
+                    // The open-book view applies the order itself; only the export is rearranged.
+                    let result = try await exporter(book.reordered(order), options, destination, processRunner) { [weak self] update in
                         Task { @MainActor [weak self] in self?.receive(update, id: id) }
                     }
                     jobs[index].output = result; jobs[index].state = .done

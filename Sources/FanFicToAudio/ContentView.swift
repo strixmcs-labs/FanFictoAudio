@@ -85,10 +85,12 @@ struct ContentView: View {
                         Button("Select All") { model.selectedChapters = Set(book.chapters.map(\.id)) }
                         Button("Select Reading Order") { model.selectedChapters = Set(book.chapters.filter(\.includedByDefault).map(\.id)) }
                         Button("Deselect All") { model.selectedChapters = [] }
+                        Divider()
+                        Button("Restore EPUB Order", action: model.restoreSpineOrder).disabled(model.customChapterOrder == nil)
                     } label: { Image(systemName: "checklist") }.menuStyle(.borderlessButton).frame(width: 28)
                 }.padding(.horizontal, 20).padding(.bottom, 12).disabled(model.busy)
                 List(selection: $model.focusedChapter) {
-                    ForEach(Array(book.chapters.enumerated()), id: \.element.id) { index, chapter in
+                    ForEach(Array(model.orderedChapters.enumerated()), id: \.element.id) { index, chapter in
                         HStack(alignment: .top, spacing: 10) {
                             Toggle("Include \(chapter.title)", isOn: Binding(
                                 get: { model.selectedChapters.contains(chapter.id) },
@@ -101,10 +103,12 @@ struct ContentView: View {
                         }
                         .padding(.vertical, 5)
                         .tag(chapter.id)
+                        .contextMenu { chapterMoveMenu(chapter.id, count: book.chapters.count) }
                     }
+                    .onMove(perform: moveAction)
                 }.listStyle(.sidebar)
-                Text("Sections follow the EPUB spine. Navigation and non-linear extras start unchecked.")
-                    .font(.caption2).foregroundStyle(.secondary).padding(20)
+                orderFooter
+
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "text.book.closed").font(.system(size: 35)).foregroundStyle(.tertiary)
@@ -115,6 +119,31 @@ struct ContentView: View {
             Label(model.provider == .system ? "Narration on your Mac" : "AI narration via \(model.provider.rawValue)", systemImage: model.provider == .system ? "desktopcomputer" : "waveform").font(.caption).foregroundStyle(.secondary).padding(20)
         }
         .background(Color.white)
+    }
+
+    private var moveAction: ((IndexSet, Int) -> Void)? {
+        model.busy ? nil : { model.moveChapters(from: $0, to: $1) }
+    }
+
+    private var orderFooter: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(model.customChapterOrder == nil
+                 ? "Sections follow the EPUB spine. Drag a section to change the reading order. Navigation and non-linear extras start unchecked."
+                 : "Custom reading order. Exports and saved queue settings use this order.")
+                .font(.caption2).foregroundStyle(.secondary)
+            if model.customChapterOrder != nil {
+                Spacer(minLength: 4)
+                Button("Restore", action: model.restoreSpineOrder).controlSize(.small).disabled(model.busy)
+                    .help("Restore the EPUB’s original reading order")
+            }
+        }.padding(20)
+    }
+
+    @ViewBuilder private func chapterMoveMenu(_ id: String, count: Int) -> some View {
+        Button("Move to Top") { model.moveChapter(id, by: -count) }.disabled(!model.canMoveChapter(id, by: -1))
+        Button("Move Up") { model.moveChapter(id, by: -1) }.disabled(!model.canMoveChapter(id, by: -1))
+        Button("Move Down") { model.moveChapter(id, by: 1) }.disabled(!model.canMoveChapter(id, by: 1))
+        Button("Move to Bottom") { model.moveChapter(id, by: count) }.disabled(!model.canMoveChapter(id, by: 1))
     }
 
     private var outputSettings: some View {
@@ -150,7 +179,7 @@ struct ContentView: View {
     private var narrationSettings: some View { NarrationSettingsView(model: model) }
 
     @ViewBuilder private var chapterPreview: some View {
-        if let chapter = model.currentChapter {
+        if let chapter = model.currentChapter, let text = model.currentNarratedText {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text("Text preview").font(.headline)
@@ -158,10 +187,14 @@ struct ContentView: View {
                     Text(chapter.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 ScrollView {
-                    Text(String(chapter.text.prefix(8000))).font(.system(size: 14, design: .serif)).lineSpacing(5)
+                    Text(text.isEmpty ? "This section is only author’s notes, so it will be skipped." : String(text.prefix(8000)))
+                        .font(.system(size: 14, design: .serif)).lineSpacing(5)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(height: 125)
-                if chapter.text.count > 8000 { Text("Showing the first part of this section. Export includes its full text.").font(.caption2).foregroundStyle(.secondary) }
+                if text != chapter.text {
+                    Text("Showing the text as it will be narrated with your author’s note and title choices.").font(.caption2).foregroundStyle(.secondary)
+                }
+                if text.count > 8000 { Text("Showing the first part of this section. Export includes its full text.").font(.caption2).foregroundStyle(.secondary) }
             }
         }
     }
