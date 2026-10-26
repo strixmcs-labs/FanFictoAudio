@@ -78,4 +78,4 @@ For a synthetic 100-chapter EPUB containing about 2.2 MB of prose, 20 fresh read
 - Programmatic checks confirm usable decoded audio and metadata. Narration quality was not independently judged by listening.
 - GitHub CI repeats offline suites and packaging; headless tests do not replace native UI or listening checks.
 
-See the [1.2.0 release](https://github.com/strixmcs-labs/FanFictoAudio/releases/tag/v1.2.0) for the exact archive and its SHA-256 companion.
+See the [1.2.0 release](https://github.com/strixmcs-labs/fanfic-to-audio/releases/tag/v1.2.0) for the exact archive and its SHA-256 companion.

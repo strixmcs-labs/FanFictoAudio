@@ -2,14 +2,14 @@
 
 `StrixMCS Labs · Dr. Matt Booth`
 
-[![Tests](https://github.com/strixmcs-labs/FanFictoAudio/actions/workflows/ci.yml/badge.svg)](https://github.com/strixmcs-labs/FanFictoAudio/actions/workflows/ci.yml)
+[![Tests](https://github.com/strixmcs-labs/fanfic-to-audio/actions/workflows/ci.yml/badge.svg)](https://github.com/strixmcs-labs/fanfic-to-audio/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Download fanfiction as EPUB, then turn it into an audiobook in one native Mac app. FanFic to Audio combines a SwiftUI interface, the [FanFicFare](https://github.com/JimmXinu/FanFicFare) download engine, and local or AI narration.
 
 **Powered by FanFicFare**, by **Jim Miller (JimmXinu) and the FanFicFare contributors**. FanFicFare provides the story download engine and site adapters used by this app.
 
-**[Download the macOS app](https://github.com/strixmcs-labs/FanFictoAudio/releases/latest)** · **[Installation guide](docs/installation.md)** · **[User guide](docs/usage.md)**
+**[Download the macOS app](https://github.com/strixmcs-labs/fanfic-to-audio/releases/latest)** · **[Installation guide](docs/installation.md)** · **[User guide](docs/usage.md)**
 
 The packaged app requires **Apple silicon and macOS 14 or later**. Python and FanFicFare are included. A standalone FFmpeg encoder with MP3 and AAC support is included, so no separate FFmpeg installation is needed. Check the selected release notes for its signing and notarization status; see the installation guide before opening it.
 

@@ -5,8 +5,8 @@
 ## Start from a clean clone
 
 ```sh
-git clone https://github.com/strixmcs-labs/FanFictoAudio.git
-cd FanFictoAudio
+git clone https://github.com/strixmcs-labs/fanfic-to-audio.git
+cd fanfic-to-audio
 xcode-select --install  # Only if Apple's development tools are missing.
 swift --version
 python3.12 -m venv .venv
