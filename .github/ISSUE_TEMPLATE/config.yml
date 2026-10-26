@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Private security report
-    url: https://github.com/strixmcs-labs/FanFictoAudio/security/advisories/new
+    url: https://github.com/strixmcs-labs/fanfic-to-audio/security/advisories/new
     about: Report credential exposure or other security vulnerabilities privately.

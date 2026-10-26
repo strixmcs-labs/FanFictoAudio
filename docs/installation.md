@@ -17,7 +17,7 @@ The app includes Python and FanFicFare. You do not need either original applicat
 
 ## Install the release
 
-1. Open [Releases](https://github.com/strixmcs-labs/FanFictoAudio/releases/latest).
+1. Open [Releases](https://github.com/strixmcs-labs/fanfic-to-audio/releases/latest).
 2. Download the app ZIP or DMG and its checksum file from the same release. Release assets include the version and architecture in their names. GitHub's **Source code** ZIP is the source tree, not the ready-to-run app.
 3. Optionally verify the downloaded archive from the folder containing both files:
 
