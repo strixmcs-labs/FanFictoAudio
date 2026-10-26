@@ -2,10 +2,10 @@ import AppKit
 import SwiftUI
 
 enum AppTheme {
-    /// Oxblood in light mode; a lighter wine in dark mode so text and controls keep their contrast.
+    /// Oxblood in light mode; a lighter wine in dark mode that keeps text at 4.5:1 or better (brand guide, Labs applications).
     static let oxblood = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            ? NSColor(red: 0.80, green: 0.36, blue: 0.43, alpha: 1)
+            ? NSColor(red: 211 / 255.0, green: 113 / 255.0, blue: 129 / 255.0, alpha: 1) // #D37181: 4.5:1+ on dark backgrounds
             : NSColor(red: 101 / 255.0, green: 15 / 255.0, blue: 32 / 255.0, alpha: 1)
     })
     /// White in light mode, matching the original design; the system text background in dark mode.
