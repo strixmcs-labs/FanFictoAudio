@@ -2,7 +2,7 @@
 
 ## Report a vulnerability privately
 
-Use [GitHub private vulnerability reporting](https://github.com/thatosxguy/FanFictoAudio/security/advisories/new) for security issues involving credentials, unsafe file handling, or malicious EPUBs. Please include the affected version, impact, and a minimal synthetic reproduction. Do not post API keys, passwords, session cookies, private story links, or real user books in a public issue.
+Use [GitHub private vulnerability reporting](https://github.com/strixmcs-labs/FanFictoAudio/security/advisories/new) for security issues involving credentials, unsafe file handling, or malicious EPUBs. Please include the affected version, impact, and a minimal synthetic reproduction. Do not post API keys, passwords, session cookies, private story links, or real user books in a public issue.
 
 Security fixes target the current release. There is no guaranteed response time or long-term support commitment.
 

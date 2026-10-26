@@ -5,7 +5,7 @@
 ## Start from a clean clone
 
 ```sh
-git clone https://github.com/thatosxguy/FanFictoAudio.git
+git clone https://github.com/strixmcs-labs/FanFictoAudio.git
 cd FanFictoAudio
 xcode-select --install  # Only if Apple's development tools are missing.
 swift --version

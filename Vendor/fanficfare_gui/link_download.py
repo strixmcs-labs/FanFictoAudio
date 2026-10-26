@@ -1,5 +1,5 @@
 """Story-page and bounded direct-EPUB downloads for FanFic to Audio.
-Copyright 2026 Matt and contributors. Licensed under Apache 2.0.
+Copyright 2026 StrixMCS Labs, Dr. Matt Booth, and other contributors. Licensed under Apache 2.0.
 """
 from pathlib import Path, PurePosixPath
 import posixpath
