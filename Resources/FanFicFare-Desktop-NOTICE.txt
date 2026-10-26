@@ -1,5 +1,5 @@
 FanFicFare Desktop
-Copyright 2026 thatosxguy and contributors.
+Copyright 2026 StrixMCS Labs, Dr. Matt Booth, and other contributors.
 
 This desktop interface is licensed under the Apache License, Version 2.0.
 See LICENSE for the license terms.
