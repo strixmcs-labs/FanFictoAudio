@@ -4,4 +4,4 @@ Dr. Matt Booth’s publisher policies are now maintained in a separate repositor
 
 [Read the current Privacy Policy](https://github.com/strixmcs-labs/policies/blob/main/PRIVACY-POLICY.md).
 
-Contact: [admin@strixmcs.com](mailto:admin@strixmcs.com).
+Contact: [labs@strixmcs.org](mailto:labs@strixmcs.org).
