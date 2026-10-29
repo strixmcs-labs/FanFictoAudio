@@ -142,7 +142,7 @@ public enum SpeechTools {
         return candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }).map { URL(fileURLWithPath: $0) }
     }
 
-    public static func verifyFFmpeg(_ url: URL, runner: ProcessRunner, mode: ExportMode = .single) async throws {
+    public static func verifyFFmpeg(_ url: URL, runner: ProcessRunner, mode: ExportMode = .single, tempo: Bool = false) async throws {
         guard FileManager.default.isExecutableFile(atPath: url.path) else {
             throw AudiobookError.conversion("Select an executable FFmpeg binary to encode audiobook audio.")
         }
@@ -150,6 +150,12 @@ public enum SpeechTools {
         guard result.standardOutput.contains(mode == .m4b ? " aac " : "libmp3lame") else {
             let encoder = mode == .m4b ? "AAC" : "libmp3lame MP3"
             throw AudiobookError.conversion("This FFmpeg build does not include the \(encoder) encoder.")
+        }
+        if tempo {
+            let filters = try await runner.run(url, arguments: ["-hide_banner", "-filters"])
+            guard filters.standardOutput.contains(" atempo ") else {
+                throw AudiobookError.conversion("This FFmpeg build cannot change narration speed. Choose a speed the provider supports, or another FFmpeg build.")
+            }
         }
     }
 }

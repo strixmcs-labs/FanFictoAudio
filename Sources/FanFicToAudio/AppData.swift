@@ -57,7 +57,7 @@ enum AppData {
     }
     var openBookEstimate: String {
         guard provider != .system, book != nil else { return "" }
-        return estimateDescription(selectedNarratedChapters, speed: apiSpeed, budget: try? budget())
+        return estimateDescription(selectedNarratedChapters, speed: provider.requestSpeed(apiSpeed), budget: try? budget())
     }
     func estimateDescription(_ chapters: [BookChapter], speed: Double, budget: APIBudget?) -> String {
         let count = chapters.reduce(0) { $0 + $1.characterCount }
@@ -84,7 +84,7 @@ enum AppData {
                     let characterCount = chapters.reduce(0) { $0 + $1.characterCount }
                     let policy = try budget(priceID: preset?.pricingID)
                     let estimate = policy.estimate(characters: characterCount, bytes: chapters.reduce(0) { $0 + $1.utf8Count },
-                        words: chapters.reduce(0) { $0 + $1.wordCount }, speed: preset?.speed ?? apiSpeed)
+                        words: chapters.reduce(0) { $0 + $1.wordCount }, speed: preset.map { $0.provider.requestSpeed($0.speed) } ?? jobProvider.requestSpeed(apiSpeed))
                     count += characterCount
                     if let estimate { cost += estimate } else { priced = false }
                 }

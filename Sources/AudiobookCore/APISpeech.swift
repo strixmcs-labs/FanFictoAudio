@@ -3,8 +3,17 @@ import Foundation
 public enum NarrationProvider: String, CaseIterable, Identifiable, Sendable, Codable {
     case system = "macOS voices", openAI = "OpenAI", elevenLabs = "ElevenLabs", openRouter = "OpenRouter"
     public var id: String { rawValue }
-    public var speedRange: ClosedRange<Double> {
-        switch self { case .elevenLabs: 0.7...1.2; case .openRouter: 0.5...2; default: 0.25...4 }
+    /// Speeds offered for narration. Anything outside what the provider generates is
+    /// reached by changing the tempo of the returned audio while encoding.
+    public var speedRange: ClosedRange<Double> { (self == .openAI ? 0.25 : 0.5)...6 }
+    /// Speeds the provider itself accepts. OpenRouter models differ in speed support, so
+    /// their speech is always generated at normal speed and changed locally.
+    public var nativeSpeedRange: ClosedRange<Double> {
+        switch self { case .elevenLabs: 0.7...1.2; case .openRouter: 1...1; default: 0.25...4 }
+    }
+    /// The part of a narration speed sent to the provider.
+    public func requestSpeed(_ speed: Double) -> Double {
+        min(max(speed, nativeSpeedRange.lowerBound), nativeSpeedRange.upperBound)
     }
     /// Simultaneous speech requests during export. Low enough for entry-level rate and
     /// concurrency limits; failed requests are not retried, so they are never billed twice.
@@ -30,6 +39,10 @@ public struct APINarration: Sendable {
         self.provider = provider; self.model = model; self.voice = voice
         self.speed = speed; self.instructions = instructions; self.apiKey = apiKey
     }
+    /// The speed the provider generates at.
+    public var requestSpeed: Double { provider.requestSpeed(speed) }
+    /// The remaining speed change, applied to the returned audio without changing pitch.
+    public var tempo: Double { speed / requestSpeed }
     public func validate() throws {
         guard provider != .system, !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !model.isEmpty, !voice.isEmpty, provider.speedRange.contains(speed), instructions.count <= 4096 else {
@@ -93,19 +106,19 @@ public struct APISpeechClient: Sendable {
         if settings.provider == .openAI {
             url = URL(string: "https://api.openai.com/v1/audio/speech")!
             body = ["model": settings.model, "voice": settings.voice, "input": text,
-                    "response_format": "wav", "speed": settings.speed]
+                    "response_format": "wav", "speed": settings.requestSpeed]
             if !settings.instructions.isEmpty && !settings.model.hasPrefix("tts-1") {
                 body["instructions"] = settings.instructions
             }
         } else if settings.provider == .openRouter {
             url = URL(string: "https://openrouter.ai/api/v1/audio/speech")!
             body = ["model": settings.model, "voice": settings.voice, "input": text, "response_format": "mp3"]
-            // Some routed models reject any speed but the default, and others ignore instructions.
-            if settings.speed != 1 { body["speed"] = settings.speed }
+            // Speed is applied locally, since some routed models reject any speed but the default.
+            // Models that don't support instructions ignore them.
             if !settings.instructions.isEmpty { body["instructions"] = settings.instructions }
         } else {
             url = URL(string: "https://api.elevenlabs.io/v1/text-to-speech/\(settings.voice)?output_format=mp3_44100_128")!
-            body = ["model_id": settings.model, "text": text, "voice_settings": ["speed": settings.speed]]
+            body = ["model_id": settings.model, "text": text, "voice_settings": ["speed": settings.requestSpeed]]
         }
         var request = authorized(url: url, provider: settings.provider, key: settings.apiKey)
         request.httpMethod = "POST"

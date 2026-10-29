@@ -26,7 +26,7 @@ public enum AudiobookExporter {
             throw AudiobookError.conversion("That destination already exists. Choose a new name to preserve the existing file.")
         }
         progress(ExportProgress(0, "Checking audio encoder…"))
-        try await SpeechTools.verifyFFmpeg(options.ffmpeg, runner: runner, mode: options.mode)
+        try await SpeechTools.verifyFFmpeg(options.ffmpeg, runner: runner, mode: options.mode, tempo: options.api.map { $0.tempo != 1 } ?? false)
         let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled], reason: "Creating an audiobook")
         defer { ProcessInfo.processInfo.endActivity(activity) }
         let stage = destination.deletingLastPathComponent().appendingPathComponent(".epub-audio-\(UUID().uuidString)", isDirectory: true)
@@ -97,7 +97,10 @@ public enum AudiobookExporter {
             var arguments = ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", pcm.path,
                              "-map", "0:a:0", "-vn", "-ac", "1", "-ar", sampleRate, "-c:a", options.mode == .m4b ? "aac" : "libmp3lame",
                              "-b:a", "\(options.bitrate)k"]
-            if isLast { arguments += ["-af", "apad=pad_dur=0.7"] }
+            var filters: [String] = []
+            if let tempo = options.api?.tempo, tempo != 1 { filters.append("atempo=\(tempo)") }
+            if isLast { filters.append("apad=pad_dur=0.7") }
+            if !filters.isEmpty { arguments += ["-af", filters.joined(separator: ",")] }
             arguments += ["-map_metadata", "-1", mp3.path]
             _ = try await runner.run(options.ffmpeg, arguments: arguments)
             try FileManager.default.removeItem(at: pcm)

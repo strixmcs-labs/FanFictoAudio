@@ -36,7 +36,7 @@ The reader's actor cache holds up to three books / 64 MB of extracted text and i
 
 A batch takes a shared settings snapshot and processes books sequentially. A failed book records its error and allows the next one to run. Cancelling pauses the queue and leaves later jobs waiting; retry is explicit and begins a new export.
 
-Local narration invokes `/usr/bin/say`. OpenAI, ElevenLabs, and OpenRouter use separate request formats through the same speech-service interface; OpenRouter follows the OpenAI format and returns MP3. API passages are bounded; OpenAI and OpenRouter also have a conservative UTF-8 byte limit. Provider errors are mapped to messages without displaying raw response bodies. Paid speech requests have no automatic retry. Compatible completed passages can be reused from local checkpoints on explicit retry.
+Local narration invokes `/usr/bin/say`. OpenAI, ElevenLabs, and OpenRouter use separate request formats through the same speech-service interface; OpenRouter follows the OpenAI format and returns MP3. API passages are bounded; OpenAI and OpenRouter also have a conservative UTF-8 byte limit. Speeds beyond what a provider generates are applied with FFmpeg's `atempo` filter while each passage is encoded, before the final passage's padding. Provider errors are mapped to messages without displaying raw response bodies. Paid speech requests have no automatic retry. Compatible completed passages can be reused from local checkpoints on explicit retry.
 
 The packaged encoder is built from pinned FFmpeg and LAME sources, statically links its codec libraries, and depends only on macOS system libraries. Sources and license notices accompany the binary. Network and GPL components are disabled.
 

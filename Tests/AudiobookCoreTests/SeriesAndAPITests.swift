@@ -76,11 +76,64 @@ struct SeriesAndAPITests {
                                   speed: 1.25, instructions: "Warm", apiKey: "test-key")
         let styledData = try #require(try client.speechRequest(text: "Sample.", settings: styled).httpBody)
         let styledBody = try #require(JSONSerialization.jsonObject(with: styledData) as? [String: Any])
-        #expect(styledBody["speed"] as? Double == 1.25)
+        #expect(styledBody["speed"] == nil)
         #expect(styledBody["instructions"] as? String == "Warm")
         #expect(throws: (any Error).self) { try client.speechRequest(text: String(repeating: "é", count: 1100), settings: settings(.openRouter)) }
         #expect(throws: (any Error).self) { try client.speechRequest(text: "sample", settings: APINarration(provider: .openRouter, model: "m", voice: "a/b", apiKey: "k")) }
-        #expect(throws: (any Error).self) { try client.speechRequest(text: "sample", settings: APINarration(provider: .openRouter, model: "m", voice: "v", speed: 3, apiKey: "k")) }
+        #expect(throws: (any Error).self) { try client.speechRequest(text: "sample", settings: APINarration(provider: .openRouter, model: "m", voice: "v", speed: 6.5, apiKey: "k")) }
+    }
+
+    @Test func speedsBeyondProviderLimitsAreSentAtTheLimitAndAppliedLocally() throws {
+        let client = APISpeechClient()
+        func sent(_ provider: NarrationProvider, _ speed: Double) throws -> (body: [String: Any], tempo: Double) {
+            let base = settings(provider)
+            let narration = APINarration(provider: provider, model: base.model, voice: base.voice, speed: speed, apiKey: "test-key")
+            let data = try #require(try client.speechRequest(text: "Sample.", settings: narration).httpBody)
+            return (try #require(JSONSerialization.jsonObject(with: data) as? [String: Any]), narration.tempo)
+        }
+        let openAI = try sent(.openAI, 6)
+        #expect(openAI.body["speed"] as? Double == 4 && openAI.tempo == 1.5)
+        let native = try sent(.openAI, 2)
+        #expect(native.body["speed"] as? Double == 2 && native.tempo == 1)
+        let eleven = try sent(.elevenLabs, 3)
+        #expect((eleven.body["voice_settings"] as? [String: Any])?["speed"] as? Double == 1.2 && abs(eleven.tempo - 2.5) < 1e-9)
+        let slow = try sent(.elevenLabs, 0.5)
+        #expect((slow.body["voice_settings"] as? [String: Any])?["speed"] as? Double == 0.7)
+        let router = try sent(.openRouter, 4)
+        #expect(router.body["speed"] == nil && router.tempo == 4)
+    }
+
+    @Test func fasterThanProviderExportShortensAudio() async throws {
+        let ffmpeg = try #require(SpeechTools.findFFmpeg(), "FFmpeg is required for the audio integration tests.")
+        let root = try directory(); defer { try? FileManager.default.removeItem(at: root) }
+        let wav = root.appendingPathComponent("fixture.wav")
+        let format = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
+        let frames: AVAudioFrameCount = 24000 * 3
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+        buffer.frameLength = frames
+        for index in 0..<Int(frames) { buffer.floatChannelData![0][index] = sin(Float(index) * 0.12) * 0.3 }
+        do { let file = try AVAudioFile(forWriting: wav, settings: format.settings); try file.write(from: buffer) }
+        let data = try Data(contentsOf: wav)
+        let client = APISpeechClient(transport: { request in
+            (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "audio/wav"])!)
+        })
+        let book = EPUBBook(title: "Tempo", author: "Test", language: "en", chapters: [BookChapter(id: "1", title: "One", text: "Sample.")],
+                            source: root.appendingPathComponent("original.epub"))
+        func duration(speed: Double) async throws -> Double {
+            let destination = root.appendingPathComponent("audio-\(speed).mp3")
+            let api = APINarration(provider: .openAI, model: "gpt-4o-mini-tts", voice: "marin", speed: speed, apiKey: "test-key")
+            let options = ExportOptions(voice: "", wordsPerMinute: 175, bitrate: 128, mode: .single, chapterIDs: ["1"], ffmpeg: ffmpeg, api: api)
+            _ = try await AudiobookExporter.export(book: book, options: options, destination: destination, apiClient: client)
+            let decoded = root.appendingPathComponent("decoded-\(speed).wav")
+            _ = try await ProcessRunner().run(ffmpeg, arguments: ["-nostdin", "-hide_banner", "-loglevel", "error", "-i", destination.path, "-c:a", "pcm_s16le", decoded.path])
+            let file = try AVAudioFile(forReading: decoded)
+            return Double(file.length) / file.processingFormat.sampleRate
+        }
+        // The mocked provider returns 3 s of audio either way; the final 0.7 s of padding is added after the tempo change.
+        let nativeSpeed = try await duration(speed: 4)
+        let faster = try await duration(speed: 6)
+        #expect(abs(nativeSpeed - 3.7) < 0.15)
+        #expect(abs(faster - 2.7) < 0.15)
     }
 
     @Test func openRouterCatalogListsDecodableModelsWithoutCredentials() async throws {

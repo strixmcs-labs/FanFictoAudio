@@ -39,6 +39,13 @@ struct NarrationSettingsView: View {
                     Text(String(format: "%.2f×", model.apiSpeed)).monospacedDigit().frame(width: 65)
                     previewButton
                 }
+                if !model.provider.nativeSpeedRange.contains(model.apiSpeed) {
+                    Text(model.provider == .openRouter
+                         ? "OpenRouter speech is generated at normal speed, then sped up or slowed down without changing pitch."
+                         : String(format: "%@ generates %.2f×; the rest of the change is applied to the audio without changing pitch.",
+                                  model.provider.rawValue, model.provider.requestSpeed(model.apiSpeed)))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 HStack {
                     SecureField("API key for \(model.provider.rawValue)", text: $model.apiKeyDraft).textFieldStyle(.roundedBorder)
                     Button("Save Key", action: model.saveAPIKey).disabled(model.apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -104,7 +111,7 @@ struct NarrationSettingsView: View {
                 }
             }
             TextField("Narration style (optional; used by models that support it)", text: $model.instructions).textFieldStyle(.roundedBorder)
-            Text("Speech is requested as MP3. Gemini TTS and HeyGen Voice return only raw PCM and aren’t supported yet; speeds other than 1.00× work only on models that support them.")
+            Text("Speech is requested as MP3. Gemini TTS and HeyGen Voice return only raw PCM and aren’t supported yet.")
                 .font(.caption).foregroundStyle(.secondary)
         } else {
             HStack {

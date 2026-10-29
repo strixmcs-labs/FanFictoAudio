@@ -533,7 +533,16 @@ final class AppModel: ObservableObject {
                     defer { try? FileManager.default.removeItem(at: audio) }
                     try await APISpeechClient().synthesize(text: sample, settings: api, destination: audio, usage: usageLedger, budget: try budget())
                     try runner.checkCancellation()
-                    _ = try await runner.run(URL(fileURLWithPath: "/usr/bin/afplay"), arguments: [audio.path])
+                    var playback = audio
+                    // Match the export: speeds the provider can't generate are applied locally.
+                    if api.tempo != 1, let ffmpeg {
+                        playback = audio.deletingPathExtension().appendingPathExtension("tempo.wav")
+                        _ = try await runner.run(ffmpeg, arguments: ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", audio.path,
+                                                                     "-af", "atempo=\(api.tempo)", "-c:a", "pcm_s16le", playback.path])
+                    }
+                    defer { if playback != audio { try? FileManager.default.removeItem(at: playback) } }
+                    try runner.checkCancellation()
+                    _ = try await runner.run(URL(fileURLWithPath: "/usr/bin/afplay"), arguments: [playback.path])
                 } else {
                     _ = try await runner.run(SpeechTools.say, arguments: ["-v", chosenVoice, "-r", String(chosenRate), "--", sample])
                 }
