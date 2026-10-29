@@ -3,7 +3,7 @@ import Foundation
 public enum SpeechText {
     public static func preview(_ text: String, provider: NarrationProvider) -> String {
         let prefix = String(text.prefix(550))
-        let bounded = chunks(prefix, limit: 550, utf8Limit: provider == .openAI ? 2000 : nil).first ?? ""
+        let bounded = chunks(prefix, limit: 550, utf8Limit: provider.utf8Limit).first ?? ""
         if let end = bounded.range(of: #"[.!?](?:\s|$)"#, options: [.regularExpression, .backwards]) {
             return String(bounded[..<end.upperBound])
         }

@@ -25,6 +25,8 @@ For Dr. Matt Booth's handling of support correspondence, contributions, and priv
 | Narrate or preview using OpenAI | Book passages and narration settings to OpenAI's speech endpoint, authenticated with your key |
 | Narrate or preview using ElevenLabs | Book passages and voice/model settings to ElevenLabs' speech endpoint, authenticated with your key |
 | Load ElevenLabs voices | Your account's voice-library endpoint, authenticated with your key; no book text is needed |
+| Narrate or preview using OpenRouter | Book passages and model, voice, speed, and style settings to OpenRouter's speech endpoint, authenticated with your key; OpenRouter forwards them to the provider that serves the chosen model |
+| Load OpenRouter models | OpenRouter's public model catalog; no key or book text is sent |
 
 AI calls are billed and governed by your provider account. Provider retention and account policies are outside this app's control; consult the provider before sending sensitive text. Cancellation stops the active request but cannot retract text already sent or guarantee that a provider will not charge for it.
 

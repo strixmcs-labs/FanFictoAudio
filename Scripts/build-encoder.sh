@@ -39,7 +39,7 @@ cd "$build_root/ffmpeg-8.1.2"
     --enable-demuxer=aiff,concat,flac,image2,image_png_pipe,image_jpeg_pipe,mp3,wav,mov,ffmetadata \
     --enable-parser=png,mjpeg,flac,mpegaudio,aac \
     --enable-muxer=mp3,flac,mp4,ipod,wav,null --enable-protocol=file,pipe \
-    --enable-filter=aformat,anull,apad,aresample,scale,format --enable-swresample --enable-swscale \
+    --enable-filter=aformat,anull,apad,atempo,aresample,scale,format --enable-swresample --enable-swscale \
     --extra-cflags="-I$prefix/include" --extra-ldflags="-L$prefix/lib" > "$encoder_root/ffmpeg-configure.log" 2>&1
 make -j "$jobs" > "$encoder_root/ffmpeg-build.log" 2>&1
 make install > "$encoder_root/ffmpeg-install.log" 2>&1

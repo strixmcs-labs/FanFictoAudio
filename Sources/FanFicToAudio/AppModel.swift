@@ -43,6 +43,8 @@ final class AppModel: ObservableObject {
     @Published var openAIVoice = UserDefaults.standard.string(forKey: "openAIVoice") ?? "marin" { didSet { UserDefaults.standard.set(openAIVoice, forKey: "openAIVoice") } }
     @Published var elevenModel = UserDefaults.standard.string(forKey: "elevenModel") ?? "eleven_multilingual_v2" { didSet { UserDefaults.standard.set(elevenModel, forKey: "elevenModel"); restorePricing() } }
     @Published var elevenVoice = UserDefaults.standard.string(forKey: "elevenVoice") ?? "" { didSet { UserDefaults.standard.set(elevenVoice, forKey: "elevenVoice") } }
+    @Published var openRouterModel = UserDefaults.standard.string(forKey: "openRouterModel") ?? "hexgrad/kokoro-82m" { didSet { UserDefaults.standard.set(openRouterModel, forKey: "openRouterModel"); restorePricing() } }
+    @Published var openRouterVoice = UserDefaults.standard.string(forKey: "openRouterVoice") ?? "af_heart" { didSet { UserDefaults.standard.set(openRouterVoice, forKey: "openRouterVoice") } }
     @Published var skipAuthorNotes = UserDefaults.standard.bool(forKey: "skipAuthorNotes") {
         didSet { UserDefaults.standard.set(skipAuthorNotes, forKey: "skipAuthorNotes"); exportedURL = nil }
     }
@@ -65,6 +67,7 @@ final class AppModel: ObservableObject {
     @Published var hasAPIKey = false
     @Published var apiKeyStatus = ""
     @Published var apiVoices: [APIVoice] = []
+    @Published var openRouterModels: [OpenRouterSpeechModel] = []
     @Published var loadingAPIVoices = false
     @Published var seriesJobIDs: Set<UUID> = []
     @Published var seriesTitle = ""
@@ -324,12 +327,18 @@ final class AppModel: ObservableObject {
     }
 
     var narrationReady: Bool {
-        provider == .system ? !voice.isEmpty : hasAPIKey && !(provider == .openAI ? openAIVoice : elevenVoice).isEmpty
+        provider == .system ? !voice.isEmpty : hasAPIKey && !apiVoice.isEmpty
+    }
+    /// The model and voice chosen for the current AI provider; empty for macOS voices.
+    var apiModel: String {
+        switch provider { case .system: ""; case .openAI: openAIModel; case .elevenLabs: elevenModel; case .openRouter: openRouterModel }
+    }
+    var apiVoice: String {
+        switch provider { case .system: ""; case .openAI: openAIVoice; case .elevenLabs: elevenVoice; case .openRouter: openRouterVoice }
     }
     func apiSettings() throws -> APINarration? {
         guard provider != .system else { return nil }
-        let settings = APINarration(provider: provider, model: provider == .openAI ? openAIModel : elevenModel,
-            voice: provider == .openAI ? openAIVoice : elevenVoice, speed: apiSpeed,
+        let settings = APINarration(provider: provider, model: apiModel, voice: apiVoice, speed: apiSpeed,
             instructions: instructions, apiKey: try APIKeyStore.read(provider))
         try settings.validate()
         return settings
@@ -359,6 +368,26 @@ final class AppModel: ObservableObject {
             }
         } catch { errorMessage = error.localizedDescription }
     }
+    /// Loads OpenRouter's speech models and their voices. The catalog is public, so no key is sent.
+    func loadOpenRouterModels() {
+        guard !busy, provider == .openRouter else { return }
+        loadingAPIVoices = true
+        Task {
+            defer { loadingAPIVoices = false }
+            do { openRouterModels = try await APISpeechClient().openRouterSpeechModels() }
+            catch { errorMessage = error.localizedDescription }
+        }
+    }
+    /// Chooses a catalog model, keeping the voice when the model offers it, and fills in
+    /// OpenRouter's listed rate when no rate has been entered for that model.
+    func chooseOpenRouterModel(_ choice: OpenRouterSpeechModel) {
+        openRouterModel = choice.id
+        if !choice.voices.isEmpty, !choice.voices.contains(openRouterVoice) { openRouterVoice = choice.voices[0] }
+        if aiPrice.isEmpty, let price = choice.pricePerMillionCharacters {
+            aiPriceBasis = .characters; aiPrice = String(format: "%g", price)
+        }
+    }
+    var openRouterVoices: [String] { openRouterModels.first(where: { $0.id == openRouterModel })?.voices ?? [] }
     var seriesJobs: [AudiobookJob] { audiobookQueue.jobs.filter { seriesJobIDs.contains($0.id) && $0.state == .queued } }
     func combineSeries() {
         guard !busy, seriesJobs.count >= 2 else { return }
@@ -436,8 +465,8 @@ final class AppModel: ObservableObject {
 
     /// The current controls as a credential-free preset, for comparing with a book's saved settings.
     func presetFromControls() -> NarrationPreset {
-        let api = provider == .system ? nil : APINarration(provider: provider, model: provider == .openAI ? openAIModel : elevenModel,
-            voice: provider == .openAI ? openAIVoice : elevenVoice, speed: apiSpeed, instructions: instructions, apiKey: "")
+        let api = provider == .system ? nil : APINarration(provider: provider, model: apiModel,
+            voice: apiVoice, speed: apiSpeed, instructions: instructions, apiKey: "")
         return NarrationPreset(voice: voice, wordsPerMinute: Int(rate), bitrate: bitrate, mode: mode, api: api, text: textOptions)
     }
 
@@ -453,6 +482,7 @@ final class AppModel: ObservableObject {
             rate = Double(preset.wordsPerMinute)
         case .openAI: openAIModel = preset.model; openAIVoice = preset.apiVoice; instructions = preset.instructions
         case .elevenLabs: elevenModel = preset.model; elevenVoice = preset.apiVoice
+        case .openRouter: openRouterModel = preset.model; openRouterVoice = preset.apiVoice; instructions = preset.instructions
         }
         if preset.provider != .system { apiSpeed = min(preset.provider.speedRange.upperBound, max(preset.provider.speedRange.lowerBound, preset.speed)) }
         bitrate = preset.bitrate; mode = preset.mode
@@ -499,11 +529,20 @@ final class AppModel: ObservableObject {
         previewTask = Task {
             do {
                 if let api {
-                    let audio = FileManager.default.temporaryDirectory.appendingPathComponent("tts-preview-\(UUID().uuidString)." + (api.provider == .openAI ? "wav" : "mp3"))
+                    let audio = FileManager.default.temporaryDirectory.appendingPathComponent("tts-preview-\(UUID().uuidString)." + api.provider.audioExtension)
                     defer { try? FileManager.default.removeItem(at: audio) }
                     try await APISpeechClient().synthesize(text: sample, settings: api, destination: audio, usage: usageLedger, budget: try budget())
                     try runner.checkCancellation()
-                    _ = try await runner.run(URL(fileURLWithPath: "/usr/bin/afplay"), arguments: [audio.path])
+                    var playback = audio
+                    // Match the export: speeds the provider can't generate are applied locally.
+                    if api.tempo != 1, let ffmpeg {
+                        playback = audio.deletingPathExtension().appendingPathExtension("tempo.wav")
+                        _ = try await runner.run(ffmpeg, arguments: ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", audio.path,
+                                                                     "-af", "atempo=\(api.tempo)", "-c:a", "pcm_s16le", playback.path])
+                    }
+                    defer { if playback != audio { try? FileManager.default.removeItem(at: playback) } }
+                    try runner.checkCancellation()
+                    _ = try await runner.run(URL(fileURLWithPath: "/usr/bin/afplay"), arguments: [playback.path])
                 } else {
                     _ = try await runner.run(SpeechTools.say, arguments: ["-v", chosenVoice, "-r", String(chosenRate), "--", sample])
                 }

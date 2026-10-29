@@ -66,7 +66,7 @@ public actor APIUsageLedger {
     public func reserve(text: String, settings: APINarration, budget: APIBudget?) throws {
         guard !loadFailed else { throw AudiobookError.conversion("The saved AI usage record could not be read. Reset usage before sending more text.") }
         let count = text.unicodeScalars.count
-        let cost = budget?.estimate(text, speed: settings.speed)
+        let cost = budget?.estimate(text, speed: settings.requestSpeed)
         if let limit = budget?.characterLimit, count > limit - summary.characters {
             throw APIUsageError.budgetReached("AI character budget reached. Increase the limit or reset usage to continue.")
         }

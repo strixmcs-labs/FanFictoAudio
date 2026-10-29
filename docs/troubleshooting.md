@@ -14,7 +14,7 @@
 | A failed book remains in the queue | Select it, use **Retry Selected**, then **Start Queue**. Later books continue after ordinary failures. |
 | A series combines in the wrong order | Use **Move Up** / **Move Down** before combining. The merger follows queue order, not checkbox selection order. |
 | Title pages are narrated | Open the book, uncheck unwanted sections, and use **Add Open Book** for a queue job with that selection. |
-| API preview/export is disabled | Choose the provider, enter your API key, and click **Save Key**. ElevenLabs also needs a valid voice ID. |
+| API preview/export is disabled | Choose the provider, enter your API key, and click **Save Key**. ElevenLabs also needs a valid voice ID; OpenRouter needs a model and voice. |
 | API authentication or permission error | Check the saved provider key, model, voice access, and account permissions. Remove and replace the key if needed. |
 | API quota or rate error | Check your provider account and retry explicitly when ready. The app does not automatically retry paid speech. |
 | Retrying an audiobook repeats earlier narration | Compatible completed passages are reused in version 1.3. Changed text/settings, discarded checkpoints, or the unfinished passage can require new narration and API charges. |
