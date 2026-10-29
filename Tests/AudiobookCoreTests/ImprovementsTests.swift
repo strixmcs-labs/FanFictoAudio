@@ -29,7 +29,7 @@ struct ImprovementsTests {
     }
     @Test func multilingualPreviewsFitActualRequestBounds() throws {
         for text in [String(repeating: "नमस्ते दुनिया ", count: 200), String(repeating: "👩🏽‍💻", count: 1000), String(repeating: "a\u{301}\u{302}", count: 1000)] {
-            for provider in [NarrationProvider.openAI, .elevenLabs] {
+            for provider in [NarrationProvider.openAI, .elevenLabs, .openRouter] {
                 let preview = SpeechText.preview(text, provider: provider)
                 #expect(!preview.isEmpty)
                 #expect(text.hasPrefix(preview))

@@ -61,6 +61,49 @@ struct SeriesAndAPITests {
         #expect(throws: (any Error).self) { try client.speechRequest(text: "sample", settings: APINarration(provider: .elevenLabs, model: "test", voice: "../bad", speed: 2, apiKey: "test")) }
     }
 
+    @Test func openRouterRequestsSendMP3AndOnlyNonDefaultOptions() throws {
+        let client = APISpeechClient()
+        let router = try client.speechRequest(text: "A short sample.", settings: settings(.openRouter))
+        #expect(router.url?.absoluteString == "https://openrouter.ai/api/v1/audio/speech")
+        #expect(router.value(forHTTPHeaderField: "Authorization") == "Bearer test-key")
+        let routerData = try #require(router.httpBody)
+        let body = try #require(JSONSerialization.jsonObject(with: routerData) as? [String: Any])
+        #expect(body["model"] as? String == "hexgrad/kokoro-82m")
+        #expect(body["voice"] as? String == "af_heart")
+        #expect(body["response_format"] as? String == "mp3")
+        #expect(body["speed"] == nil && body["instructions"] == nil)
+        let styled = APINarration(provider: .openRouter, model: "microsoft/mai-voice-2", voice: "en-US-Harper:MAI-Voice-2",
+                                  speed: 1.25, instructions: "Warm", apiKey: "test-key")
+        let styledData = try #require(try client.speechRequest(text: "Sample.", settings: styled).httpBody)
+        let styledBody = try #require(JSONSerialization.jsonObject(with: styledData) as? [String: Any])
+        #expect(styledBody["speed"] as? Double == 1.25)
+        #expect(styledBody["instructions"] as? String == "Warm")
+        #expect(throws: (any Error).self) { try client.speechRequest(text: String(repeating: "é", count: 1100), settings: settings(.openRouter)) }
+        #expect(throws: (any Error).self) { try client.speechRequest(text: "sample", settings: APINarration(provider: .openRouter, model: "m", voice: "a/b", apiKey: "k")) }
+        #expect(throws: (any Error).self) { try client.speechRequest(text: "sample", settings: APINarration(provider: .openRouter, model: "m", voice: "v", speed: 3, apiKey: "k")) }
+    }
+
+    @Test func openRouterCatalogListsDecodableModelsWithoutCredentials() async throws {
+        let json = """
+        {"data":[
+          {"id":"hexgrad/kokoro-82m","name":"hexgrad: Kokoro 82M","pricing":{"prompt":"0.00000062","completion":"0"},"supported_voices":["af_heart","am_adam"]},
+          {"id":"google/gemini-3.8-flash-tts","name":"Google: Gemini","pricing":{"prompt":"0.0000005","completion":"0.000009"},"supported_voices":["Puck"]},
+          {"id":"bytedance-seed/seed-audio-1-0","name":"ByteDance Seed: Audio","pricing":{"prompt":"0","completion":"0.0025"}},
+          {"id":"heygen/heygen-voice-1","name":"HeyGen Voice","pricing":{"prompt":"0.000015","completion":"0"},"supported_voices":["nadine"]}
+        ]}
+        """
+        let client = APISpeechClient(transport: { request in
+            #expect(request.url?.absoluteString == "https://openrouter.ai/api/v1/models?output_modalities=speech")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+            return (Data(json.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        })
+        let models = try await client.openRouterSpeechModels()
+        #expect(models.map(\.id) == ["bytedance-seed/seed-audio-1-0", "hexgrad/kokoro-82m"])
+        #expect(models[0].voices.isEmpty && models[0].pricePerMillionCharacters == nil)
+        #expect(models[1].voices == ["af_heart", "am_adam"])
+        #expect(abs((models[1].pricePerMillionCharacters ?? 0) - 0.62) < 1e-9)
+    }
+
     @Test func APIErrorDoesNotExposeResponseAndDoesNotRetry() async throws {
         let recorder = RequestCount()
         let client = APISpeechClient(transport: { request in
@@ -108,7 +151,7 @@ struct SeriesAndAPITests {
         #expect(chunks.joined() == text)
     }
 
-    @Test(arguments: [NarrationProvider.openAI, .elevenLabs]) func mockedAPIExportProducesAudibleMP3AndCleansStaging(provider: NarrationProvider) async throws {
+    @Test(arguments: [NarrationProvider.openAI, .elevenLabs, .openRouter]) func mockedAPIExportProducesAudibleMP3AndCleansStaging(provider: NarrationProvider) async throws {
         let ffmpeg = try #require(SpeechTools.findFFmpeg(), "FFmpeg is required for the audio integration tests.")
         let root = try directory(); defer { try? FileManager.default.removeItem(at: root) }
         let wav = root.appendingPathComponent("fixture.wav")
@@ -118,7 +161,7 @@ struct SeriesAndAPITests {
         for index in 0..<2400 { buffer.floatChannelData![0][index] = sin(Float(index) * 0.12) * 0.3 }
         do { let file = try AVAudioFile(forWriting: wav, settings: format.settings); try file.write(from: buffer) }
         var audioSource = wav
-        if provider == .elevenLabs {
+        if provider.audioExtension == "mp3" {
             audioSource = root.appendingPathComponent("fixture.mp3")
             _ = try await ProcessRunner().run(ffmpeg, arguments: ["-nostdin", "-hide_banner", "-loglevel", "error", "-i", wav.path, "-c:a", "libmp3lame", audioSource.path])
         }
@@ -139,7 +182,11 @@ struct SeriesAndAPITests {
     }
 
     private func settings(_ provider: NarrationProvider) -> APINarration {
-        APINarration(provider: provider, model: provider == .openAI ? "gpt-4o-mini-tts" : "eleven_multilingual_v2", voice: provider == .openAI ? "marin" : "voice123", apiKey: "test-key")
+        switch provider {
+        case .openAI: APINarration(provider: provider, model: "gpt-4o-mini-tts", voice: "marin", apiKey: "test-key")
+        case .openRouter: APINarration(provider: provider, model: "hexgrad/kokoro-82m", voice: "af_heart", apiKey: "test-key")
+        default: APINarration(provider: provider, model: "eleven_multilingual_v2", voice: "voice123", apiKey: "test-key")
+        }
     }
     private func directory() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("series-api-test-\(UUID().uuidString)")

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.1 — Unreleased
+
+- Add **OpenRouter** as an AI speech provider, using your own OpenRouter API key. **Load Models** lists OpenRouter's speech models and their voices from its public catalog without sending your key, and fills in the listed per-character rate when you haven't entered one. The default is Kokoro 82M with the `af_heart` voice.
+- OpenRouter speech is requested as MP3. Gemini TTS and HeyGen Voice return only raw PCM and are left out of the model list. Speed is sent only when it isn't 1.00×, and narration style only when entered, because some routed models reject or ignore them.
+- Send up to three OpenRouter requests at once during export, with the same 1,500-character and 2,000-byte passage limits as OpenAI. Failed requests are still never retried automatically.
+- Saved queues, presets, and completed passages from 1.5.0 remain compatible.
+
 ## 1.5.0 — 2026-10-23
 
 - Split **Create Audiobook** into **Voice & Text**, **Open Book**, and **Queue** panes, with a narration summary and **Change…** shortcut where books are exported.

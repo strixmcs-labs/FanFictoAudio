@@ -21,7 +21,7 @@ Version 1.5 adds custom chapter order and titles, author's-note skipping, read-a
 - Add several EPUBs at once, reorder the audiobook queue, pause it, and retry unsuccessful jobs.
 - Follow the selected or active queue item in the open-book preview.
 - Combine separate EPUBs into an ordered series without changing the originals.
-- Narrate with macOS voices, OpenAI, or ElevenLabs. Provider keys are saved explicitly in macOS Keychain.
+- Narrate with macOS voices, OpenAI, ElevenLabs, or OpenRouter. Provider keys are saved explicitly in macOS Keychain.
 - Export one MP3 per book, numbered chapter MP3s, or an M4B with chapter navigation and cover art.
 - Reuse a bounded EPUB cache and avoid redundant intermediate MP3 encoding steps.
 

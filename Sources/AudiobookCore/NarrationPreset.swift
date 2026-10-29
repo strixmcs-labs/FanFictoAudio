@@ -27,7 +27,7 @@ public struct NarrationPreset: Codable, Sendable, Equatable {
         guard provider == other.provider, bitrate == other.bitrate, mode == other.mode, textOptions == other.textOptions else { return false }
         if provider == .system { return voice == other.voice && wordsPerMinute == other.wordsPerMinute }
         return model == other.model && apiVoice == other.apiVoice && speed == other.speed
-            && (provider != .openAI || instructions == other.instructions)
+            && (provider == .elevenLabs || instructions == other.instructions)
     }
     public func api(key: String) -> APINarration? {
         provider == .system ? nil : APINarration(provider: provider, model: model, voice: apiVoice, speed: speed, instructions: instructions, apiKey: key)

@@ -61,6 +61,7 @@ struct NarrationSettingsView: View {
             .onChange(of: model.rate) { _, _ in model.stopPreview() }
             .onChange(of: model.openAIVoice) { _, _ in model.stopPreview() }
             .onChange(of: model.elevenVoice) { _, _ in model.stopPreview() }
+            .onChange(of: model.openRouterVoice) { _, _ in model.stopPreview() }
             .onChange(of: model.apiSpeed) { _, _ in model.stopPreview() }
     }
     private var previewButton: some View {
@@ -82,6 +83,29 @@ struct NarrationSettingsView: View {
             if !model.openAIModel.hasPrefix("tts-1") {
                 TextField("Narration style (optional), e.g. warm and expressive", text: $model.instructions).textFieldStyle(.roundedBorder)
             }
+        } else if model.provider == .openRouter {
+            HStack {
+                TextField("Model, e.g. hexgrad/kokoro-82m", text: $model.openRouterModel).textFieldStyle(.roundedBorder)
+                if model.openRouterModels.isEmpty {
+                    Button(model.loadingAPIVoices ? "Loading…" : "Load Models", action: model.loadOpenRouterModels)
+                } else {
+                    Menu("Models") {
+                        ForEach(model.openRouterModels) { choice in Button(choice.name) { model.chooseOpenRouterModel(choice) } }
+                    }.frame(width: 95)
+                }
+            }
+            HStack {
+                TextField("Voice, e.g. af_heart", text: $model.openRouterVoice).textFieldStyle(.roundedBorder)
+                if !model.openRouterVoices.isEmpty {
+                    Picker("Model voice", selection: $model.openRouterVoice) {
+                        if !model.openRouterVoices.contains(model.openRouterVoice) { Text("Enter voice").tag(model.openRouterVoice) }
+                        ForEach(model.openRouterVoices, id: \.self) { Text($0).tag($0) }
+                    }.frame(width: 235)
+                }
+            }
+            TextField("Narration style (optional; used by models that support it)", text: $model.instructions).textFieldStyle(.roundedBorder)
+            Text("Speech is requested as MP3. Gemini TTS and HeyGen Voice return only raw PCM and aren’t supported yet; speeds other than 1.00× work only on models that support them.")
+                .font(.caption).foregroundStyle(.secondary)
         } else {
             HStack {
                 TextField("Model", text: $model.elevenModel).textFieldStyle(.roundedBorder)

@@ -10,7 +10,7 @@
 | macOS | 14 or later |
 | MP3 encoder | Bundled FFmpeg with `libmp3lame` (MP3) and `aac` (M4B) |
 | Local narration | At least one voice exposed by macOS `say` |
-| AI narration | Your own OpenAI or ElevenLabs API key and available API quota |
+| AI narration | Your own OpenAI, ElevenLabs, or OpenRouter API key and available API quota |
 | Network | Needed for story downloads and AI speech; existing EPUBs with macOS voices work locally |
 
 The app includes Python and FanFicFare. You do not need either original application or a separate Python installation to use the release.

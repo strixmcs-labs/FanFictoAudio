@@ -1,14 +1,20 @@
 import Foundation
 
 public enum NarrationProvider: String, CaseIterable, Identifiable, Sendable, Codable {
-    case system = "macOS voices", openAI = "OpenAI", elevenLabs = "ElevenLabs"
+    case system = "macOS voices", openAI = "OpenAI", elevenLabs = "ElevenLabs", openRouter = "OpenRouter"
     public var id: String { rawValue }
-    public var speedRange: ClosedRange<Double> { self == .elevenLabs ? 0.7...1.2 : 0.25...4 }
+    public var speedRange: ClosedRange<Double> {
+        switch self { case .elevenLabs: 0.7...1.2; case .openRouter: 0.5...2; default: 0.25...4 }
+    }
     /// Simultaneous speech requests during export. Low enough for entry-level rate and
     /// concurrency limits; failed requests are not retried, so they are never billed twice.
     public var concurrentRequests: Int {
-        switch self { case .system: 1; case .openAI: 3; case .elevenLabs: 2 }
+        switch self { case .system: 1; case .openAI, .openRouter: 3; case .elevenLabs: 2 }
     }
+    /// OpenAI limits speech input to 2000 bytes, and OpenRouter can route to OpenAI models.
+    public var utf8Limit: Int? { self == .openAI || self == .openRouter ? 2000 : nil }
+    /// The audio format each provider is asked to return.
+    public var audioExtension: String { self == .openAI ? "wav" : "mp3" }
 }
 
 public struct APINarration: Sendable {
@@ -29,8 +35,13 @@ public struct APINarration: Sendable {
               !model.isEmpty, !voice.isEmpty, provider.speedRange.contains(speed), instructions.count <= 4096 else {
             throw AudiobookError.conversion("Choose an API voice and model, save its API key, and choose a valid speed.")
         }
-        guard voice.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil else {
-            throw AudiobookError.conversion("The API voice ID must contain only letters, numbers, underscores, or hyphens.")
+        // ElevenLabs voice IDs go in the URL path. OpenRouter voices are sent in the body
+        // and some use periods and colons, such as "en-US-Harper:MAI-Voice-2".
+        let allowed = provider == .openRouter ? #"^[A-Za-z0-9_.:-]+$"# : #"^[A-Za-z0-9_-]+$"#
+        guard voice.range(of: allowed, options: .regularExpression) != nil else {
+            throw AudiobookError.conversion(provider == .openRouter
+                ? "The OpenRouter voice must contain only letters, numbers, periods, colons, underscores, or hyphens."
+                : "The API voice ID must contain only letters, numbers, underscores, or hyphens.")
         }
     }
 }
@@ -41,6 +52,32 @@ public struct APIVoice: Identifiable, Sendable, Decodable {
     enum CodingKeys: String, CodingKey { case id = "voice_id", name }
 }
 
+/// A speech model from OpenRouter's public catalog.
+public struct OpenRouterSpeechModel: Identifiable, Sendable, Decodable {
+    public let id: String
+    public let name: String
+    public let voices: [String]
+    /// USD per million input characters, when the model is priced only by characters.
+    public let pricePerMillionCharacters: Double?
+    enum CodingKeys: String, CodingKey { case id, name, voices = "supported_voices", pricing }
+    struct Pricing: Decodable { let prompt: String?; let completion: String? }
+    public init(id: String, name: String, voices: [String], pricePerMillionCharacters: Double? = nil) {
+        self.id = id; self.name = name; self.voices = voices; self.pricePerMillionCharacters = pricePerMillionCharacters
+    }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? id
+        voices = try container.decodeIfPresent([String].self, forKey: .voices) ?? []
+        let pricing = try container.decodeIfPresent(Pricing.self, forKey: .pricing)
+        // Models that also charge for audio output have no reliable per-character rate.
+        if let prompt = pricing?.prompt.flatMap(Double.init), prompt.isFinite, prompt > 0,
+           (pricing?.completion.flatMap(Double.init) ?? 0) == 0 {
+            pricePerMillionCharacters = prompt * 1_000_000
+        } else { pricePerMillionCharacters = nil }
+    }
+}
+
 public struct APISpeechClient: Sendable {
     public typealias Transport = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
     private let transport: Transport
@@ -48,8 +85,8 @@ public struct APISpeechClient: Sendable {
 
     public func speechRequest(text: String, settings: APINarration) throws -> URLRequest {
         try settings.validate()
-        guard !text.isEmpty, text.unicodeScalars.count <= 1500, settings.provider != .openAI || text.utf8.count <= 2000 else {
-            throw AudiobookError.conversion("API speech passages must contain 1 to 1500 characters, with a 2000-byte limit for OpenAI.")
+        guard !text.isEmpty, text.unicodeScalars.count <= 1500, text.utf8.count <= settings.provider.utf8Limit ?? .max else {
+            throw AudiobookError.conversion("API speech passages must contain 1 to 1500 characters, with a 2000-byte limit for OpenAI and OpenRouter.")
         }
         let url: URL
         var body: [String: Any]
@@ -60,6 +97,12 @@ public struct APISpeechClient: Sendable {
             if !settings.instructions.isEmpty && !settings.model.hasPrefix("tts-1") {
                 body["instructions"] = settings.instructions
             }
+        } else if settings.provider == .openRouter {
+            url = URL(string: "https://openrouter.ai/api/v1/audio/speech")!
+            body = ["model": settings.model, "voice": settings.voice, "input": text, "response_format": "mp3"]
+            // Some routed models reject any speed but the default, and others ignore instructions.
+            if settings.speed != 1 { body["speed"] = settings.speed }
+            if !settings.instructions.isEmpty { body["instructions"] = settings.instructions }
         } else {
             url = URL(string: "https://api.elevenlabs.io/v1/text-to-speech/\(settings.voice)?output_format=mp3_44100_128")!
             body = ["model_id": settings.model, "text": text, "voice_settings": ["speed": settings.speed]]
@@ -109,10 +152,24 @@ public struct APISpeechClient: Sendable {
         return voices.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
+    /// Lists OpenRouter's speech models from its public catalog; no API key is sent.
+    /// Gemini TTS and HeyGen Voice return only raw PCM, which has no header to decode, so
+    /// they are left out.
+    public func openRouterSpeechModels() async throws -> [OpenRouterSpeechModel] {
+        let url = URL(string: "https://openrouter.ai/api/v1/models?output_modalities=speech")!
+        let (data, response) = try await transport(URLRequest(url: url, timeoutInterval: 60))
+        try Task.checkCancellation()
+        try Self.check(response, provider: .openRouter)
+        struct Catalog: Decodable { let data: [OpenRouterSpeechModel] }
+        return try JSONDecoder().decode(Catalog.self, from: data).data
+            .filter { !$0.id.hasPrefix("google/") && !$0.id.hasPrefix("heygen/") }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
     private func authorized(url: URL, provider: NarrationProvider, key: String) -> URLRequest {
         var request = URLRequest(url: url, timeoutInterval: 180)
-        request.setValue(provider == .openAI ? "Bearer \(key)" : key,
-                         forHTTPHeaderField: provider == .openAI ? "Authorization" : "xi-api-key")
+        if provider == .elevenLabs { request.setValue(key, forHTTPHeaderField: "xi-api-key") }
+        else { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         return request
     }
     private static func check(_ response: HTTPURLResponse, provider: NarrationProvider) throws {
@@ -120,6 +177,7 @@ public struct APISpeechClient: Sendable {
             let hint: String
             switch response.statusCode {
             case 401, 403: hint = "Check the API key and its permissions."
+            case 402: hint = "Add credits to your account, then retry when ready."
             case 429: hint = "Check your quota or rate limit, then retry when ready."
             default: hint = "Check the voice, model, and provider status, then retry when ready."
             }
@@ -142,7 +200,7 @@ public struct APISpeechClient: Sendable {
         return (try Data(contentsOf: file), http)
     }
     // Reuse connections across passages. Authentication stays on each request;
-    // cookies and credential storage are disabled for both providers.
+    // cookies and credential storage are disabled for every provider.
     private static let pooledSession: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 180

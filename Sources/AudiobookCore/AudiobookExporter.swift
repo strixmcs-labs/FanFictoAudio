@@ -44,7 +44,7 @@ public enum AudiobookExporter {
         let partExtension = options.mode == .m4b ? "m4a" : "mp3"
         let totalCharacters = max(1, chapters.reduce(0) { $0 + $1.text.count })
         var completedCharacters = 0
-        let chunked = chapters.map { speechChunks($0.text, limit: options.api == nil ? 6000 : 1500, utf8Limit: options.api?.provider == .openAI ? 2000 : nil) }
+        let chunked = chapters.map { speechChunks($0.text, limit: options.api == nil ? 6000 : 1500, utf8Limit: options.api?.provider.utf8Limit) }
         func passageName(_ chapterIndex: Int, _ chunkIndex: Int) -> String { "part-\(chapterIndex)-\(chunkIndex).\(partExtension)" }
         var cachedPassages: [String: CachedPassage] = [:]
         if let checkpoint {
@@ -62,7 +62,7 @@ public enum AudiobookExporter {
             for (chapterIndex, chunks) in chunked.enumerated() {
                 for (chunkIndex, chunk) in chunks.enumerated() where cachedPassages[passageName(chapterIndex, chunkIndex)] == nil {
                     speechRequests.append((passageName(chapterIndex, chunkIndex), chunk,
-                        work.appendingPathComponent("speech-\(chapterIndex)-\(chunkIndex).\(api.provider == .openAI ? "wav" : "mp3")"),
+                        work.appendingPathComponent("speech-\(chapterIndex)-\(chunkIndex).\(api.provider.audioExtension)"),
                         chunkIndex == chunks.count - 1))
                 }
             }
@@ -84,7 +84,7 @@ public enum AudiobookExporter {
         /// Validates and encodes one passage, saving it to the checkpoint when there is one.
         func encode(_ speech: URL, partName: String, isLast: Bool) async throws -> (url: URL, duration: Double) {
             var pcm = speech
-            if options.api?.provider == .elevenLabs {
+            if options.api?.provider.audioExtension == "mp3" {
                 // Validate decoded PCM; Core Audio cannot seek in every MP3 variant.
                 let decoded = work.appendingPathComponent("decoded-\(partName).wav")
                 _ = try await runner.run(options.ffmpeg, arguments: ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", pcm.path, "-map", "0:a:0", "-c:a", "pcm_s16le", decoded.path])

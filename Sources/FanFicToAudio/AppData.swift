@@ -10,7 +10,7 @@ enum AppData {
 }
 
 @MainActor extension AppModel {
-    var pricingID: String { provider.rawValue + "." + (provider == .openAI ? openAIModel : elevenModel) }
+    var pricingID: String { provider.rawValue + "." + apiModel }
     func savePricing() {
         guard !restoringPricing else { return }
         UserDefaults.standard.set(["price": aiPrice, "basis": aiPriceBasis.rawValue], forKey: "aiPricing." + pricingID)
