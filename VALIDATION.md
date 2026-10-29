@@ -1,8 +1,20 @@
 # Validation
 
-Last checked: October 23, 2026. Candidate: **1.5.0**, build **6**.
+Last checked: October 29, 2026. Candidate: **1.5.1**, build **7**.
 
-## Version 1.5 checks
+## Version 1.5.1 checks
+
+- **76 native tests passed**: 65 audiobook tests, 5 download-bridge tests, and 6 app-model tests. **50 Python tests passed**, with two upstream deprecation warnings. GitHub Actions passed on pull request #11, and the suites were repeated locally on `main` after its merge.
+- New coverage includes the OpenRouter request format (endpoint, Bearer key, MP3 output, style sent only when entered, no speed sent), voice validation that accepts OpenRouter's period and colon voice names, the 2,000-byte passage limit, catalog decoding and filtering with no key sent, multilingual previews, and a mocked OpenRouter MP3 export through the real encoder.
+- Speed coverage checks that each provider is asked for the closest speed it supports (OpenAI up to 4×, ElevenLabs 0.7–1.2×, OpenRouter 1×), and that a mocked 6× OpenAI export decodes to the expected shorter duration than a 4× export, with the final passage's padding added after the tempo change.
+- The decoder was checked against OpenRouter's live public speech catalog (32 usable models after the PCM-only Gemini TTS and HeyGen Voice models are removed). The bundled encoder now includes `atempo`; a 2.6 s local speech sample encoded at 6× decoded to about 0.4 s.
+- All nested code and the app were signed with Developer ID Application, team `CF67T8RW6F`, hardened runtime, and secure timestamps, from source identical to `main` at the merge of pull request #11. The signed bundle passed deep/strict verification and the packaged helper/local narration smoke check (single MP3, chapter MP3s, M4B, metadata, 192 kbps streams).
+- Apple accepted the app submission `dfca9dbc-65df-4a69-8662-7cd3359af694` and the DMG submission `a96dec97-de97-4415-a1c5-211b5bae2260`; both tickets were stapled and validated. The app extracted from the release ZIP and the DMG both assess as `Notarized Developer ID`, and both release checksums verify.
+- Live OpenRouter, OpenAI, and ElevenLabs calls (including speed changes on real voices and provider rate limits), the new OpenRouter and speed controls in the interface, installation on another Mac, Intel packaging, and subjective narration quality at high speeds were not verified.
+
+## Version 1.5.0 historical validation
+
+Checked October 23, 2026: version 1.5.0, build 6.
 
 - **72 native tests passed**: 61 audiobook tests, 5 download-bridge tests, and 6 app-model tests. **50 Python tests passed**, with two upstream deprecation warnings. GitHub Actions passed on the merged source.
 - New coverage includes author's-note detection and prose that must be kept, short-section safety, read-aloud title de-duplication, pronunciations, section renaming, custom reading order (including checkpoint separation for reordered books), backward-compatible decoding of 1.4 queues/presets/text options, Finder opening, and download-list restoration.

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.1 — Unreleased
+## 1.5.1 — 2026-10-29
 
 - Add **OpenRouter** as an AI speech provider, using your own OpenRouter API key. **Load Models** lists OpenRouter's speech models and their voices from its public catalog without sending your key, and fills in the listed per-character rate when you haven't entered one. The default is Kokoro 82M with the `af_heart` voice.
 - OpenRouter speech is requested as MP3. Gemini TTS and HeyGen Voice return only raw PCM and are left out of the model list. Narration style is sent only when entered, because some routed models ignore it.
