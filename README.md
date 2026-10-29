@@ -13,7 +13,7 @@ Download fanfiction as EPUB, then turn it into an audiobook in one native Mac ap
 
 The packaged app requires **Apple silicon and macOS 14 or later**. Python and FanFicFare are included. A standalone FFmpeg encoder with MP3 and AAC support is included, so no separate FFmpeg installation is needed. Check the selected release notes for its signing and notarization status; see the installation guide before opening it.
 
-Version 1.5 adds custom chapter order and titles, author's-note skipping, read-aloud titles, a pronunciation list, faster AI narration, completion notifications, and dark mode. Version 1.4 added automatic story/direct-EPUB link downloading, hands every completed download to the saved audiobook queue, bundles the audio encoder, and added white backgrounds with oxblood accents. Version 1.3 introduced a saved, resumable audiobook queue, per-book settings, AI usage budgets, and M4B chapter navigation with cover art. Developer builds support Developer ID signing (including a YubiKey) and Apple notarization.
+Version 1.5.1 adds OpenRouter as an AI speech provider and AI narration speeds up to 6×. Version 1.5 adds custom chapter order and titles, author's-note skipping, read-aloud titles, a pronunciation list, faster AI narration, completion notifications, and dark mode. Version 1.4 added automatic story/direct-EPUB link downloading, hands every completed download to the saved audiobook queue, bundles the audio encoder, and added white backgrounds with oxblood accents. Version 1.3 introduced a saved, resumable audiobook queue, per-book settings, AI usage budgets, and M4B chapter navigation with cover art. Developer builds support Developer ID signing (including a YubiKey) and Apple notarization.
 
 ## What it does
 

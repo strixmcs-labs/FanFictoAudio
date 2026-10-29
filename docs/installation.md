@@ -22,7 +22,7 @@ The app includes Python and FanFicFare. You do not need either original applicat
 3. Optionally verify the downloaded archive from the folder containing both files:
 
    ```sh
-   shasum -a 256 -c FanFic-to-Audio-1.5.0-macOS-arm64.sha256
+   shasum -a 256 -c FanFic-to-Audio-1.5.1-macOS-arm64.sha256
    ```
 
 4. Extract the ZIP or open the DMG, then drag **FanFic to Audio.app** into Applications. Keep the whole bundle intact.
